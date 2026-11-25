@@ -1,9 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { translations, type Locale } from "@/lib/i18n";
 import { requestTrial, type TrialStatus } from "@/lib/trial-client";
 
-export function TrialSettings({ trial, onChange }: { trial: TrialStatus; onChange: (status: TrialStatus) => void }) {
+export function TrialSettings({
+  locale, trial, onChange,
+}: {
+  locale: Locale;
+  trial: TrialStatus;
+  onChange: (status: TrialStatus) => void;
+}) {
+  const t = translations[locale].trial;
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -18,10 +26,10 @@ export function TrialSettings({ trial, onChange }: { trial: TrialStatus; onChang
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
-      });
+      }, locale);
       onChange(status);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "暂时无法连接体验账户。");
+      setError(cause instanceof Error ? cause.message : t.connectError);
     } finally {
       setBusy(false);
     }
@@ -30,12 +38,12 @@ export function TrialSettings({ trial, onChange }: { trial: TrialStatus; onChang
   return (
     <form onSubmit={(event) => void changeAccess(event)}>
       <p className="muted dialog-intro">
-        {trial.model ? `正在体验 ${trial.model}。` : "输入体验密码，即可使用内置模型。"}
-        {trial.hourlyLimit !== null && ` 每个 IP 每小时最多 ${trial.hourlyLimit} 次扫描。`}
+        {trial.model ? `${t.usingPrefix}${trial.model}.` : t.enterPasswordPrompt}
+        {trial.hourlyLimit !== null && `${t.hourlyLimitPrefix}${trial.hourlyLimit}${t.hourlyLimitSuffix}`}
       </p>
       {!trial.model && (
         <label className="field">
-          <span>体验密码</span>
+          <span>{t.passwordLabel}</span>
           <input type="password" autoComplete="off" required maxLength={256}
             value={password} onChange={(event) => setPassword(event.target.value)} />
         </label>
@@ -43,7 +51,7 @@ export function TrialSettings({ trial, onChange }: { trial: TrialStatus; onChang
       {error && <p className="error-message" role="alert">{error}</p>}
       <div className="dialog-actions">
         <button type="submit" className="button primary" disabled={busy}>
-          {busy ? "请稍等…" : trial.model ? "退出体验" : "开启体验"}
+          {busy ? t.wait : trial.model ? t.exit : t.enable}
         </button>
       </div>
     </form>

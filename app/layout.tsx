@@ -3,10 +3,10 @@ import { themeBootstrap } from "@/lib/appearance";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI爽窥",
-  description: "偷窥你想知道的一切",
+  title: "AI Peek",
+  description: "Peek at everything you want to know.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "AI爽窥" },
+  appleWebApp: { capable: true, title: "AI Peek" },
   icons: {
     icon: { url: "/app-icon-64.png", sizes: "64x64", type: "image/png" },
     shortcut: "/app-icon-64.png",
@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeBootstrap }} /></head>
       <body>{children}</body>
     </html>

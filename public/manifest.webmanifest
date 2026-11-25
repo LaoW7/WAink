@@ -1,7 +1,7 @@
 {
-  "name": "AI爽窥",
-  "short_name": "AI爽窥",
-  "lang": "zh-CN",
+  "name": "AI Peek",
+  "short_name": "AI Peek",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

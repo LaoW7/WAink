@@ -2,6 +2,7 @@
 
 import { ChevronDown, Eye, EyeOff, KeyRound, Settings2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { translations, type Locale } from "@/lib/i18n";
 import {
   hasInternationalNode, presets, providers, resolveModelNode, resolveProvider,
   type Credentials, type Provider, type ModelRegion,
@@ -11,8 +12,9 @@ import type { TrialStatus } from "@/lib/trial-client";
 import { TrialSettings } from "./trial-settings";
 
 export function ModelSettings({
-  config, trial, preferTrial, onTrialChange, onClose, onSave, onClear,
+  locale, config, trial, preferTrial, onTrialChange, onClose, onSave, onClear,
 }: {
+  locale: Locale;
   config: Credentials | null;
   trial: TrialStatus;
   preferTrial: boolean;
@@ -21,6 +23,8 @@ export function ModelSettings({
   onSave: (config: Credentials) => void;
   onClear: () => void;
 }) {
+  const t = translations[locale].settings;
+  const providerLabels = translations[locale].providers;
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState<Credentials>(
     () => config ?? { provider: "auto", model: providers.auto.model, apiKey: "", baseUrl: "" },
@@ -73,22 +77,22 @@ export function ModelSettings({
     const apiKey = draft.apiKey.trim();
     const model = draft.model.trim();
     if (!/^[\x21-\x7E]{1,2048}$/.test(apiKey)) {
-      setError("请输入有效的 API Key。");
+      setError(t.errInvalidKey);
       return;
     }
     if (!/^[\w.:/@+-]{1,180}$/.test(model)) {
-      setError("请输入模型服务提供的模型名称。");
+      setError(t.errInvalidModel);
       return;
     }
     if (draft.provider === "auto" && !resolveProvider("auto", model)) {
-      setError("无法从此模型名称匹配节点。请选择服务商或使用自定义接口。");
+      setError(t.errUnmatchedAuto);
       return;
     }
     const baseUrl = draft.baseUrl.trim();
     try {
-      if (draft.provider === "custom") completionEndpoint(baseUrl);
+      if (draft.provider === "custom") completionEndpoint(baseUrl, locale);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "请检查接口地址。");
+      setError(cause instanceof Error ? cause.message : t.errCheckEndpoint);
       return;
     }
     onSave({ ...draft, apiKey, model, baseUrl });
@@ -99,61 +103,67 @@ export function ModelSettings({
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
       <div className="dialog-heading">
         <div className="dialog-icon"><Settings2 size={22} aria-hidden /></div>
-        <button type="button" className="icon-button" aria-label="关闭模型设置" onClick={onClose}>
+        <button type="button" className="icon-button" aria-label={t.closeAria} onClick={onClose}>
           <X size={21} aria-hidden />
         </button>
       </div>
-      <h2 id="settings-title">配置你的 AI</h2>
+      <h2 id="settings-title">{t.title}</h2>
       {trial.available && !trial.model && (
-        <div className="mode-tabs settings-modes" aria-label="模型接入方式">
-          <button type="button" aria-pressed={!trialTab} onClick={() => setTrialTab(false)}>自己的 API</button>
-          <button type="button" aria-pressed={trialTab} onClick={() => setTrialTab(true)}>体验账户</button>
+        <div className="mode-tabs settings-modes" aria-label={t.modeAria}>
+          <button type="button" aria-pressed={!trialTab} onClick={() => setTrialTab(false)}>{t.tabOwn}</button>
+          <button type="button" aria-pressed={trialTab} onClick={() => setTrialTab(true)}>{t.tabTrial}</button>
         </div>
       )}
-      {trial.available && (trialTab || trial.model) ? <TrialSettings trial={trial} onChange={onTrialChange} /> : (
+      {trial.available && (trialTab || trial.model) ? (
+        <TrialSettings locale={locale} trial={trial} onChange={onTrialChange} />
+      ) : (
       <form onSubmit={save}>
-        <p className="muted dialog-intro">先找个眼神好的。选支持图片输入的模型，再填 API Key。</p>
+        <p className="muted dialog-intro">{t.intro}</p>
         <label className="field">
-          <span>模型服务</span>
+          <span>{t.providerLabel}</span>
           <span className="select-shell">
             <select value={draft.provider} onChange={(event) => changeProvider(event.target.value as Provider)}>
-              {Object.entries(providers).map(([id, provider]) => <option key={id} value={id}>{provider.label}</option>)}
+              {(Object.keys(providers) as Provider[]).map((id) => (
+                <option key={id} value={id}>{providerLabels[id]}</option>
+              ))}
             </select>
             <ChevronDown size={18} aria-hidden />
           </span>
         </label>
         {draft.provider === "custom" && (
           <label className="field">
-            <span>接口地址</span>
-            <input type="url" value={draft.baseUrl} placeholder="https://api.example.com/v1"
+            <span>{t.endpointLabel}</span>
+            <input type="url" value={draft.baseUrl} placeholder={t.endpointPlaceholder}
               onChange={(event) => setDraft({ ...draft, baseUrl: event.target.value })}
               maxLength={500} required autoComplete="off" spellCheck={false} />
-            <small>使用 Chat Completions 接口。图片和 Key 由浏览器发往此地址，接口需允许跨域请求。</small>
+            <small>{t.endpointHelp}</small>
           </label>
         )}
         <label className="field">
-          <span>模型名称</span>
-          <input value={draft.model} placeholder="输入可识别图片的模型 ID" maxLength={180}
+          <span>{t.modelLabel}</span>
+          <input value={draft.model} placeholder={t.modelPlaceholder} maxLength={180}
             list={draft.provider === "auto" ? "vision-model-presets" : undefined}
             onChange={(event) => changeModel(event.target.value)}
             required autoComplete="off" autoCapitalize="off" spellCheck={false} />
           {draft.provider === "auto" && (
             <datalist id="vision-model-presets">
-              {Object.values(presets).map((preset) => <option key={preset.model} value={preset.model} label={preset.label} />)}
+              {(Object.entries(presets) as [keyof typeof presets, (typeof presets)[keyof typeof presets]][]).map(([id, preset]) => (
+                <option key={preset.model} value={preset.model} label={providerLabels[id]} />
+              ))}
             </datalist>
           )}
-          {node && <small>{draft.provider === "auto" ? providers[node.provider].label + " · " : "官方节点 · "}
+          {node && <small>{draft.provider === "auto" ? providerLabels[node.provider] + " · " : t.officialNode}
             {new URL(node.endpoint).hostname}</small>}
-          {draft.provider === "auto" && !node && <small>可选择预设视觉模型，或为此模型手动选择服务商。</small>}
-          {draft.provider === "custom" && <small>可换成接口支持的视觉模型。接口支持时自动使用低思考。</small>}
+          {draft.provider === "auto" && !node && <small>{t.autoHint}</small>}
+          {draft.provider === "custom" && <small>{t.customHint}</small>}
         </label>
         {showRegion && (
           <label className="field">
-            <span>API Key 所属地区</span>
+            <span>{t.regionLabel}</span>
             <span className="select-shell">
               <select value={draft.region ?? "cn"} onChange={(event) => changeRegion(event.target.value as ModelRegion)}>
-                <option value="cn">中国内地</option>
-                <option value="international">{node?.provider === "qwen" ? "国际站（新加坡）" : "国际站"}</option>
+                <option value="cn">{t.regionCn}</option>
+                <option value="international">{node?.provider === "qwen" ? t.regionIntlSg : t.regionIntl}</option>
               </select>
               <ChevronDown size={18} aria-hidden />
             </span>
@@ -163,20 +173,20 @@ export function ModelSettings({
           <label htmlFor="api-key">API Key</label>
           <div className="secret-field">
             <input id="api-key" type={showKey ? "text" : "password"} value={draft.apiKey}
-              placeholder="粘贴你的 API Key" required maxLength={2048}
+              placeholder={t.apiKeyPlaceholder} required maxLength={2048}
               autoComplete="off" autoCapitalize="off" spellCheck={false}
               onChange={(event) => setDraft({ ...draft, apiKey: event.target.value })} />
-            <button type="button" className="icon-button" aria-label={showKey ? "隐藏 Key" : "显示 Key"}
+            <button type="button" className="icon-button" aria-label={showKey ? t.hideKey : t.showKey}
               onClick={() => setShowKey(!showKey)}>
               {showKey ? <EyeOff size={19} aria-hidden /> : <Eye size={19} aria-hidden />}
             </button>
           </div>
         </div>
-        <p className="privacy-note"><KeyRound size={15} aria-hidden /> Key 保存在当前浏览器，可在此清除。</p>
+        <p className="privacy-note"><KeyRound size={15} aria-hidden /> {t.privacyNote}</p>
         {error && <p className="error-message" role="alert">{error}</p>}
         <div className="dialog-actions">
-          {config && <button type="button" className="button text-button" onClick={onClear}>清除配置</button>}
-          <button className="button primary" type="submit">启用模型</button>
+          {config && <button type="button" className="button text-button" onClick={onClear}>{t.clearButton}</button>}
+          <button className="button primary" type="submit">{t.saveButton}</button>
         </div>
       </form>
       )}

@@ -5,16 +5,18 @@ import {
   LoaderCircle, ScanLine, Settings2, X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
+import { LanguageToggle } from "@/components/language-toggle";
 import { ModelSettings } from "@/components/model-settings";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ScanHistory } from "@/components/scan-history";
-import { sampleRecord, ScanReport, type ScanRecord } from "@/components/scan-report";
+import { sampleRecords, ScanReport, type ScanRecord } from "@/components/scan-report";
 import { MOBILE_REPORT_VIEWPORT, ScanResultSheet } from "@/components/scan-result-sheet";
 import { defaultScanPreferences, readBrowserSettings, writeModelSettings, writeScanPreferences, writeTrialPreference, type ScanPreferences } from "@/lib/browser-settings";
 import { cameraError, captureFrame, loadPhoto, useVehicleDetector } from "@/lib/camera";
 import { saveHistoryFrame, saveHistoryOutcome, type ScanOutcome, type ScanSource } from "@/lib/history";
-import { providers, resolveProvider, type Credentials } from "@/lib/model-providers";
-import { callVision, completionEndpoint, modes, scanReplySchema, scanInputSchema, type ScanMode } from "@/lib/scan";
+import { DEFAULT_LOCALE, htmlLang, readStoredLocale, translations, writeStoredLocale, type Locale } from "@/lib/i18n";
+import { resolveProvider, type Credentials } from "@/lib/model-providers";
+import { callVision, completionEndpoint, makeScanReplySchema, scanInputSchema, type ScanMode } from "@/lib/scan";
 import { inactiveTrial, requestTrial } from "@/lib/trial-client";
 import { HOLD_MS, type TargetBox } from "@/lib/vehicle-lock";
 
@@ -23,6 +25,7 @@ type ScanJob = { id: string; controller: AbortController; saved: Promise<boolean
 const SAMPLE: Frame = { kind: "sample" };
 
 export default function ScannerPage() {
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   const [config, setConfig] = useState<Credentials | null>(null);
   const [trial, setTrial] = useState(inactiveTrial);
   const [preferTrial, setPreferTrial] = useState(false);
@@ -32,7 +35,7 @@ export default function ScannerPage() {
   const [historyRevision, setHistoryRevision] = useState(0);
   const [storageWarning, setStorageWarning] = useState("");
   const [frame, setFrame] = useState<Frame>(SAMPLE);
-  const [record, setRecord] = useState<ScanRecord | null>(sampleRecord);
+  const [record, setRecord] = useState<ScanRecord | null>(sampleRecords[DEFAULT_LOCALE]);
   const [resultSheetOpen, setResultSheetOpen] = useState(false);
   const [preferences, setPreferences] = useState(defaultScanPreferences);
   const { mode, note } = preferences;
@@ -51,28 +54,37 @@ export default function ScannerPage() {
   const request = useRef<ScanJob | null>(null);
   const generation = useRef(0);
   const demoTimer = useRef(0);
+  const t = translations[locale];
   const videoActive = frame.kind === "live";
   const captured = frame.kind === "capture";
   const filePreview = frame.kind === "photo" || captured;
   const personalConfig = preferTrial ? null : config;
   const activeModel = preferTrial ? trial.model : personalConfig?.model;
   const modelLabel = personalConfig
-    ? providers[resolveProvider(personalConfig.provider, personalConfig.model) ?? personalConfig.provider].label
-    : "体验账户";
+    ? t.providers[resolveProvider(personalConfig.provider, personalConfig.model) ?? personalConfig.provider]
+    : t.trialAccountLabel;
+  const displayRecord = frame.kind === "sample" && record ? sampleRecords[locale] : record;
+
+  useEffect(() => {
+    document.documentElement.lang = htmlLang(locale);
+    document.title = translations[locale].pageTitle;
+  }, [locale]);
 
   useEffect(() => {
     const controller = new AbortController();
     let mounted = true;
+    const storedLocale = readStoredLocale();
+    setLocale(storedLocale);
     try {
       const saved = readBrowserSettings();
       setConfig(saved.config);
       setPreferences(saved.preferences);
       setPreferTrial(saved.preferTrial);
     } catch {
-      setStorageWarning("浏览器暂时无法读取本地设置。");
+      setStorageWarning(translations[storedLocale].warnReadSettings);
     }
     const timeout = window.setTimeout(() => controller.abort(), 4000);
-    void requestTrial({ signal: controller.signal })
+    void requestTrial({ signal: controller.signal }, storedLocale)
       .then((status) => {
         if (!mounted) return;
         setTrial(status);
@@ -90,12 +102,20 @@ export default function ScannerPage() {
     };
   }, []);
 
+  function toggleLocale() {
+    const next: Locale = locale === "en" ? "zh" : "en";
+    setLocale(next);
+    writeStoredLocale(next);
+    setError("");
+    setStorageWarning("");
+  }
+
   function updateConfig(next: Credentials | null) {
     setConfig(next);
     try {
       writeModelSettings(next);
     } catch {
-      setStorageWarning(next ? "当前配置可使用，但浏览器未能保存它。" : "浏览器未能移除已保存的配置，请检查此网站的存储设置。");
+      setStorageWarning(next ? t.warnSaveConfigOk : t.warnClearConfigFail);
     }
   }
 
@@ -104,7 +124,7 @@ export default function ScannerPage() {
     try {
       writeScanPreferences(next);
     } catch {
-      setStorageWarning("浏览器未能保存补充线索和识别类型。");
+      setStorageWarning(t.warnSavePrefsFail);
     }
   }
 
@@ -113,7 +133,7 @@ export default function ScannerPage() {
     try {
       writeTrialPreference(next);
     } catch {
-      setStorageWarning("浏览器未能保存体验账户选项。");
+      setStorageWarning(t.warnSaveTrialFail);
     }
   }
 
@@ -130,7 +150,7 @@ export default function ScannerPage() {
     setResultSheetOpen(window.matchMedia(MOBILE_REPORT_VIEWPORT).matches);
   }
 
-  const finishScan = useCallback((job: ScanJob, outcome: ScanOutcome) => {
+  const finishScan = useCallback((job: ScanJob, outcome: ScanOutcome, activeLocale: Locale) => {
     if (request.current !== job) return false;
     request.current = null;
     setBusy(false);
@@ -138,20 +158,20 @@ export default function ScannerPage() {
       if (!saved) return;
       await saveHistoryOutcome(job.id, outcome);
       setHistoryRevision((revision) => revision + 1);
-    }).catch(() => setStorageWarning("关键帧已保存，但浏览器未能保存本次识别结果。"));
+    }).catch(() => setStorageWarning(translations[activeLocale].warnSaveOutcomeFail));
     return true;
   }, []);
 
   const stopScan = useCallback(() => {
     const job = request.current;
     if (job) {
-      finishScan(job, { status: "cancelled", message: "本次识别已取消。" });
+      finishScan(job, { status: "cancelled", message: t.scanCancelled }, locale);
       job.controller.abort();
     }
     window.clearTimeout(demoTimer.current);
     setDemo(false);
     dismissResultSheet();
-  }, [finishScan, dismissResultSheet]);
+  }, [finishScan, dismissResultSheet, locale, t.scanCancelled]);
 
   useEffect(() => {
     function leavePage() {
@@ -162,7 +182,7 @@ export default function ScannerPage() {
       setReadingFile(false);
       setCameraReady(false);
       setFrame(SAMPLE);
-      setRecord(sampleRecord);
+      setRecord(sampleRecords[locale]);
     }
 
     window.addEventListener("pagehide", leavePage);
@@ -175,7 +195,7 @@ export default function ScannerPage() {
       job?.controller.abort();
       window.clearTimeout(demoTimer.current);
     };
-  }, [stopStream, stopScan]);
+  }, [stopStream, stopScan, locale]);
 
   useEffect(() => {
     const video = webcam.current;
@@ -189,9 +209,9 @@ export default function ScannerPage() {
       stopStream();
       setCameraReady(false);
       setFrame(SAMPLE);
-      setRecord(sampleRecord);
+      setRecord(sampleRecords[locale]);
       setSystemCamera(true);
-      setError("摄像头已断开，请重新开启，或上传图片。");
+      setError(t.cameraDisconnected);
     }
 
     video.srcObject = current;
@@ -202,7 +222,7 @@ export default function ScannerPage() {
       video.srcObject = null;
       track?.removeEventListener("ended", interrupted);
     };
-  }, [videoActive, stopStream, stopScan]);
+  }, [videoActive, stopStream, stopScan, locale, t.cameraDisconnected]);
 
   async function openCamera() {
     if (!settingsReady || openingCamera || readingFile || request.current) return;
@@ -210,7 +230,7 @@ export default function ScannerPage() {
     setSystemCamera(false);
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       setSystemCamera(true);
-      setError(cameraError(null));
+      setError(cameraError(null, locale));
       return;
     }
     const current = ++generation.current;
@@ -233,7 +253,7 @@ export default function ScannerPage() {
     } catch (cause) {
       if (generation.current !== current) return;
       setSystemCamera(true);
-      setError(cameraError(cause));
+      setError(cameraError(cause, locale));
     } finally {
       if (generation.current === current) setOpeningCamera(false);
     }
@@ -253,14 +273,16 @@ export default function ScannerPage() {
     setCameraReady(false);
     setError("");
     setFrame(SAMPLE);
-    setRecord(sampleRecord);
+    setRecord(sampleRecords[locale]);
   }
 
   async function scanImage(image: string, scanMode: ScanMode, source: ScanSource) {
     if (!activeModel || request.current) return;
-    const input = scanInputSchema.safeParse({ image, mode: scanMode, note, model: activeModel });
+    const scanLocale = locale;
+    const copy = translations[scanLocale];
+    const input = scanInputSchema.safeParse({ image, mode: scanMode, note, model: activeModel, lang: scanLocale });
     if (!input.success) {
-      setError("无法发送这张图片。请换一张清晰、较小的照片。");
+      setError(copy.errInvalidPhoto);
       return;
     }
 
@@ -272,12 +294,12 @@ export default function ScannerPage() {
 
     const id = Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) => value.toString(16).padStart(8, "0")).join("");
     const controller = new AbortController();
-    const saved = saveHistoryFrame({ id, createdAt: Date.now(), source, model: activeModel }, image)
+    const saved = saveHistoryFrame({ id, createdAt: Date.now(), source, model: activeModel, lang: scanLocale }, image)
       .then(() => {
         setHistoryRevision((revision) => revision + 1);
         return true;
       }, () => {
-        setStorageWarning("浏览器未能保存本次扫描的关键帧。请检查此网站的存储空间或权限。");
+        setStorageWarning(copy.warnSaveFrameFail);
         return false;
       });
     const job = { id, controller, saved };
@@ -287,10 +309,9 @@ export default function ScannerPage() {
     setRecord(null);
     dismissResultSheet();
     const timeout = window.setTimeout(() => {
-      const message = "模型识别超时。可以换个角度重新扫描，或切换模型。";
-      if (finishScan(job, { status: "failed", message })) {
+      if (finishScan(job, { status: "failed", message: copy.errTimeout }, scanLocale)) {
         controller.abort();
-        setError(message);
+        setError(copy.errTimeout);
       }
     }, 60_000);
 
@@ -301,17 +322,17 @@ export default function ScannerPage() {
       if (personalConfig?.provider === "custom") {
         try {
           result = await callVision({
-            endpoint: completionEndpoint(personalConfig.baseUrl), apiKey: personalConfig.apiKey,
+            endpoint: completionEndpoint(personalConfig.baseUrl, scanLocale), apiKey: personalConfig.apiKey,
             input: input.data, signal: controller.signal, reasoningEffort: "low",
           });
         } catch (cause) {
-          if (cause instanceof Error && cause.message.startsWith("连接模型服务失败")) {
-            throw new Error("连接自定义接口失败。请检查网络和接口的跨域设置。");
+          if (cause instanceof Error && (cause.message.startsWith("连接模型服务失败") || cause.message.startsWith("Failed to connect to the model service"))) {
+            throw new Error(copy.errCustomCors);
           }
           throw cause;
         }
       } else {
-        const query = new URLSearchParams({ provider: personalConfig?.provider ?? "trial" });
+        const query = new URLSearchParams({ provider: personalConfig?.provider ?? "trial", lang: scanLocale });
         if (personalConfig?.region) query.set("region", personalConfig.region);
         const response = await fetch("/api/scan?" + query, {
           method: "POST",
@@ -326,18 +347,18 @@ export default function ScannerPage() {
         if (!response.ok) {
           if (!personalConfig && response.status === 401) setTrial((current) => ({ ...current, model: null }));
           const message = data && typeof data === "object" && "error" in data && typeof data.error === "string"
-            ? data.error : "暂时无法调用模型，请稍后重试。";
+            ? data.error : copy.errCallFailed;
           throw new Error(message);
         }
-        result = scanReplySchema.parse(data);
+        result = makeScanReplySchema(scanLocale).parse(data);
       }
-      if (finishScan(job, { status: "completed", reply: result })) {
-        presentResult({ ...result, model: activeModel });
+      if (finishScan(job, { status: "completed", reply: result }, scanLocale)) {
+        presentResult({ ...result, model: activeModel, lang: scanLocale });
       }
     } catch (cause) {
-      const errorMessage = cause instanceof Error && cause.name !== "ZodError" ? cause.message : "无法读取扫描结果。";
-      const message = errorMessage === "Failed to fetch" ? "网络连接中断，请重试。" : errorMessage;
-      if (finishScan(job, { status: "failed", message })) {
+      const errorMessage = cause instanceof Error && cause.name !== "ZodError" ? cause.message : copy.errReadResult;
+      const message = errorMessage === "Failed to fetch" ? copy.errNetworkDown : errorMessage;
+      if (finishScan(job, { status: "failed", message }, scanLocale)) {
         setError(message);
       }
     } finally {
@@ -348,9 +369,9 @@ export default function ScannerPage() {
   function autoCapture(video: HTMLVideoElement, target?: TargetBox) {
     if (!activeModel || settingsOpen || historyOpen || request.current) return;
     try {
-      void scanImage(captureFrame(video, target), "vehicle", "camera");
+      void scanImage(captureFrame(video, target, locale), "vehicle", "camera");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法捕获画面，请稍后再试。");
+      setError(cause instanceof Error ? cause.message : t.errCaptureFail);
     }
   }
 
@@ -370,7 +391,7 @@ export default function ScannerPage() {
     setReadingFile(true);
     setError("");
     try {
-      const data = await loadPhoto(file);
+      const data = await loadPhoto(file, locale);
       if (generation.current !== current) return;
       stopScan();
       stopStream();
@@ -381,7 +402,7 @@ export default function ScannerPage() {
       if (activeModel) void scanImage(data, mode, "photo");
     } catch (cause) {
       if (generation.current === current) {
-        setError(cause instanceof Error ? cause.message : "图片读取失败，请重试。");
+        setError(cause instanceof Error ? cause.message : t.errLoadPhotoFail);
       }
     } finally {
       if (generation.current === current) setReadingFile(false);
@@ -394,17 +415,17 @@ export default function ScannerPage() {
     setRecord(null);
     demoTimer.current = window.setTimeout(() => {
       setDemo(false);
-      presentResult(sampleRecord);
+      presentResult(sampleRecords[locale]);
     }, HOLD_MS);
   }
 
-  let targetStatus = "把车请进圆心";
+  let targetStatus: string = t.aimWaiting;
   if (videoActive) {
-    if (!activeModel) targetStatus = preferTrial ? "请在模型设置重新开启体验" : "配置模型后可自动扫描";
-    else if (aim.phase === "loading") targetStatus = "正在加载车辆检测";
-    else if (aim.phase === "unavailable") targetStatus = "自动锁定不可用";
-    else if (aim.phase === "locking") targetStatus = "稳住，快锁住了";
-    else if (aim.phase === "captured") targetStatus = "移开后重新对准";
+    if (!activeModel) targetStatus = preferTrial ? t.aimNeedsTrial : t.aimNeedsModel;
+    else if (aim.phase === "loading") targetStatus = t.aimLoading;
+    else if (aim.phase === "unavailable") targetStatus = t.aimUnavailable;
+    else if (aim.phase === "locking") targetStatus = t.aimLocking;
+    else if (aim.phase === "captured") targetStatus = t.aimCaptured;
   }
 
   return (
@@ -413,46 +434,47 @@ export default function ScannerPage() {
         <div className="shell topbar-inner">
           <div className="brand">
             <img className="brand-icon" src="/app-icon-64.png" width={40} height={40} alt="" />
-            <span>AI爽窥</span>
+            <span>{t.brand}</span>
           </div>
           <div className="topbar-actions">
             {activeModel && <span className="model-status" title={modelLabel}>{modelLabel}</span>}
-            <button className="button settings-button" aria-label="历史记录" title="历史记录"
+            <button className="button settings-button" aria-label={t.historyButton} title={t.historyButton}
               disabled={!settingsReady} onClick={() => setHistoryOpen(true)}>
-              <History size={18} aria-hidden /><span className="toolbar-label">历史记录</span>
+              <History size={18} aria-hidden /><span className="toolbar-label">{t.historyButton}</span>
             </button>
-            <button className="button settings-button" aria-label="模型设置" title="模型设置" disabled={!settingsReady}
+            <button className="button settings-button" aria-label={t.settingsButton} title={t.settingsButton} disabled={!settingsReady}
               onClick={() => setSettingsOpen(true)}>
-              <Settings2 size={18} aria-hidden /><span className="toolbar-label">模型设置</span>
+              <Settings2 size={18} aria-hidden /><span className="toolbar-label">{t.settingsButton}</span>
             </button>
-            <ThemeToggle />
+            <LanguageToggle locale={locale} onToggle={toggleLocale} />
+            <ThemeToggle locale={locale} />
           </div>
         </div>
       </header>
 
       <main className="shell">
         <div className="intro">
-          <h1>AI爽窥</h1>
-          <p>偷窥你想知道的一切</p>
+          <h1>{t.brand}</h1>
+          <p>{t.tagline}</p>
         </div>
 
         <div className="workspace">
           <section className="panel scanner" aria-labelledby="camera-title">
             <div className="panel-heading">
-              <h2 id="camera-title" ref={scannerHeading} tabIndex={-1}><Crosshair aria-hidden />取景器</h2>
+              <h2 id="camera-title" ref={scannerHeading} tabIndex={-1}><Crosshair aria-hidden />{t.viewfinderTitle}</h2>
               <span className={videoActive ? "pill connected" : "pill frame-label"}>
                 {videoActive && <span className="indicator" />}
-                {videoActive ? "实时画面" : captured ? "摄像头已关闭" : filePreview ? "已载入图片" : "示例画面"}
+                {videoActive ? t.liveFeed : captured ? t.cameraOff : filePreview ? t.photoLoaded : t.sampleFrame}
               </span>
             </div>
 
             <div className={"viewfinder " + (filePreview ? "uploaded" : "")}>
               {videoActive ? (
-                <video ref={webcam} autoPlay muted playsInline aria-label="手机摄像头实时画面"
+                <video ref={webcam} autoPlay muted playsInline aria-label={t.liveCameraAria}
                   onPlaying={() => setCameraReady(true)} />
               ) : (
                 <img src={filePreview ? frame.data : "/coast-gt.webp"}
-                  alt={captured ? "当前扫描关键帧" : filePreview ? "待识别图片" : "海岸暮色中一辆珊瑚红双门跑车"} />
+                  alt={captured ? t.altCaptured : filePreview ? t.altPhoto : t.altSample} />
               )}
               <div className="finder-overlay" aria-hidden>
                 {(!filePreview || (captured && busy)) && (
@@ -469,18 +491,18 @@ export default function ScannerPage() {
                 {busy && frame.kind === "photo" && <span className="scanning-line" />}
               </div>
               <div className="viewfinder-caption">
-                {videoActive ? (cameraReady ? "后置优先" : "相机启动中")
-                  : captured ? "已锁定关键帧" : filePreview ? "图片预览" : "海岸 GT · 今日陪练"}
-                {demo && <span>假装很专业地锁定…</span>}
+                {videoActive ? (cameraReady ? t.captionRearPreferred : t.captionStarting)
+                  : captured ? t.captionLocked : filePreview ? t.captionPreview : t.captionSample}
+                {demo && <span>{t.captionDemo}</span>}
               </div>
             </div>
             {videoActive && <span className="sr-only" role="status">{targetStatus}</span>}
 
             {frame.kind === "photo" && (
-              <div className="mode-tabs" aria-label="图片识别类型">
-                {Object.entries(modes).map(([id, label]) => (
+              <div className="mode-tabs" aria-label={t.scanModeAria}>
+                {(Object.keys(t.modes) as ScanMode[]).map((id) => (
                   <button key={id} disabled={busy} aria-pressed={mode === id}
-                    onClick={() => updatePreferences({ ...preferences, mode: id as ScanMode })}>{label}</button>
+                    onClick={() => updatePreferences({ ...preferences, mode: id })}>{t.modes[id]}</button>
                 ))}
               </div>
             )}
@@ -488,14 +510,14 @@ export default function ScannerPage() {
             <div className="scanner-actions">
               {videoActive ? (
                 <>
-                  <button className="button primary" onClick={closeCamera}><CameraOff size={19} aria-hidden />关闭摄像头</button>
+                  <button className="button primary" onClick={closeCamera}><CameraOff size={19} aria-hidden />{t.closeCamera}</button>
                   {!activeModel && <button className="button secondary" onClick={() => setSettingsOpen(true)}>
-                    <Settings2 size={18} aria-hidden />配置 AI
+                    <Settings2 size={18} aria-hidden />{t.configureAi}
                   </button>}
                   {activeModel && aim.phase === "unavailable" && (
                     <button className="button secondary" disabled={!cameraReady || busy}
                       onClick={() => { if (webcam.current) autoCapture(webcam.current); }}>
-                      <Focus size={18} aria-hidden />扫描画面
+                      <Focus size={18} aria-hidden />{t.scanFrame}
                     </button>
                   )}
                 </>
@@ -505,28 +527,28 @@ export default function ScannerPage() {
                   {openingCamera || busy
                     ? <LoaderCircle className="spin" size={19} aria-hidden />
                     : <Camera size={19} aria-hidden />}
-                  {busy ? "正在识别…" : openingCamera ? "开启中…" : "开始扫描"}
+                  {busy ? t.scanning : openingCamera ? t.openingCamera : t.startScan}
                 </button>
               )}
               <button className="button secondary" disabled={!settingsReady || readingFile || busy || demo}
                 onClick={() => fileInput.current?.click()}>
                 {readingFile ? <LoaderCircle className="spin" size={19} aria-hidden /> : <ImagePlus size={19} aria-hidden />}
-                {readingFile ? "读取中…" : "上传图片"}
+                {readingFile ? t.readingPhoto : t.uploadPhoto}
               </button>
               {frame.kind === "sample" && !systemCamera &&
                 <button className="button text-button" disabled={!settingsReady || openingCamera || demo || readingFile}
-                  onClick={runDemo}><ScanLine size={18} aria-hidden />演示扫描</button>}
+                  onClick={runDemo}><ScanLine size={18} aria-hidden />{t.demoScan}</button>}
               {systemCamera && !videoActive && <button className="button text-button" disabled={readingFile || busy}
-                onClick={() => cameraInput.current?.click()}>系统相机</button>}
+                onClick={() => cameraInput.current?.click()}>{t.systemCamera}</button>}
               {frame.kind === "photo" && !busy && <button className="button text-button"
                 onClick={() => activeModel ? void scanImage(frame.data, mode, "photo") : setSettingsOpen(true)}>
-                <ScanLine size={18} aria-hidden />{activeModel ? (record ? "重新识别" : "识别图片") : "配置 AI 识别"}
+                <ScanLine size={18} aria-hidden />{activeModel ? (record ? t.rescanPhoto : t.scanPhoto) : t.configureAiScan}
               </button>}
               {busy && <button className="button text-button" onClick={() => {
                 stopScan();
-                setError("本次识别已取消。");
+                setError(t.scanCancelled);
               }}>
-                <X size={17} aria-hidden />取消识别
+                <X size={17} aria-hidden />{t.cancelScan}
               </button>}
             </div>
             <input ref={fileInput} type="file" accept="image/*" hidden onChange={(event) => void selectPhoto(event)} />
@@ -535,32 +557,30 @@ export default function ScannerPage() {
             {error && <p className="error-message scan-error" role="alert">{error}</p>}
             {storageWarning && <p className="error-message scan-error" role="status">{storageWarning}</p>}
             <div className="scanner-bottom">
-              <p>{videoActive
-                ? "把车请进圆心，稳住约 1.5 秒。拍下关键帧后，摄像头自动关闭。"
-                : captured && busy ? "摄像头下班了，AI 还在翻档案。"
-                : captured ? "下一个？点「开始扫描」。"
-                : "点「开始扫描」，把车请进圆心，稳住约 1.5 秒。"}</p>
+              <p>{videoActive ? t.hintLive : captured && busy ? t.hintCapturedBusy : captured ? t.hintCapturedIdle : t.hintDefault}</p>
               <details className="note-field">
-                <summary>补充线索 <ChevronDown size={15} aria-hidden /></summary>
-                <label htmlFor="scan-note">可补充车型、城市或截图背景。</label>
+                <summary>{t.extraClues} <ChevronDown size={15} aria-hidden /></summary>
+                <label htmlFor="scan-note">{t.extraCluesHelp}</label>
                 <textarea id="scan-note" value={note} maxLength={280} rows={2} disabled={!settingsReady}
                   onChange={(event) => updatePreferences({ ...preferences, note: event.target.value })} />
               </details>
             </div>
           </section>
 
-          <ScanReport record={record} busy={busy || demo}
-            awaiting={videoActive ? "对准一辆车，等待圆圈转满。"
-              : captured ? "点「开始扫描」，看看下一位。"
-              : "上传图片并配置 AI 模型即可识别。"} />
+          <ScanReport
+            locale={locale}
+            record={displayRecord}
+            busy={busy || demo}
+            awaiting={videoActive ? t.awaitingLive : captured ? t.awaitingCaptured : t.awaitingDefault}
+          />
         </div>
 
         <footer className="footer">
-          <span>每次扫描只发一张图 · 历史留在当前浏览器</span>
+          <span>{t.footerPrivacy}</span>
         </footer>
       </main>
 
-      {settingsOpen && <ModelSettings config={config} trial={trial} preferTrial={preferTrial} onClose={() => setSettingsOpen(false)}
+      {settingsOpen && <ModelSettings locale={locale} config={config} trial={trial} preferTrial={preferTrial} onClose={() => setSettingsOpen(false)}
         onTrialChange={(status) => {
           stopScan();
           setTrial(status);
@@ -570,10 +590,10 @@ export default function ScannerPage() {
         }}
         onSave={(next) => { updateConfig(next); updateTrialPreference(false); setSettingsOpen(false); setError(""); }}
         onClear={() => { stopScan(); updateConfig(null); setSettingsOpen(false); setError(""); }} />}
-      {historyOpen && <ScanHistory revision={historyRevision} activeId={request.current?.id}
+      {historyOpen && <ScanHistory locale={locale} revision={historyRevision} activeId={request.current?.id}
         onClose={() => setHistoryOpen(false)} />}
-      {resultSheetOpen && record && !settingsOpen && !historyOpen && (
-        <ScanResultSheet record={record} onDismiss={dismissResultSheet} onStartScan={startFromResult} />
+      {resultSheetOpen && displayRecord && !settingsOpen && !historyOpen && (
+        <ScanResultSheet locale={locale} record={displayRecord} onDismiss={dismissResultSheet} onStartScan={startFromResult} />
       )}
     </>
   );

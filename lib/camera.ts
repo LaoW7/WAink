@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Detection, ObjectDetector } from "@mediapipe/tasks-vision";
+import type { Locale } from "./i18n";
 import { VehicleLock, type AimState, type TargetBox } from "./vehicle-lock";
 
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024;
@@ -18,19 +19,31 @@ async function loadVehicleDetector() {
   });
 }
 
-export function cameraError(error: unknown) {
-  if (!window.isSecureContext) return "实时取景需要 HTTPS。你仍可拍照或上传图片。";
+export function cameraError(error: unknown, locale: Locale = "en") {
+  if (!window.isSecureContext) {
+    return locale === "zh"
+      ? "实时取景需要 HTTPS。你仍可拍照或上传图片。"
+      : "Live camera requires HTTPS. You can still take a photo or upload an image.";
+  }
   if (error instanceof DOMException && /NotAllowed|Security/.test(error.name)) {
-    return "浏览器没有授予摄像头权限。请在地址栏允许访问，或上传图片。";
+    return locale === "zh"
+      ? "浏览器没有授予摄像头权限。请在地址栏允许访问，或上传图片。"
+      : "Camera permission was denied. Allow access in your browser bar or upload a photo.";
   }
   if (error instanceof DOMException && error.name === "NotReadableError") {
-    return "摄像头正被占用。关闭正在使用相机的应用，再试一次。";
+    return locale === "zh"
+      ? "摄像头正被占用。关闭正在使用相机的应用，再试一次。"
+      : "Camera is in use by another app. Close it and try again.";
   }
-  return "无法开启实时取景。你可以用系统相机拍照，或上传图片。";
+  return locale === "zh"
+    ? "无法开启实时取景。你可以用系统相机拍照，或上传图片。"
+    : "Unable to start live viewfinder. Use your system camera or upload a photo.";
 }
 
-function makeJpeg(source: CanvasImageSource, width: number, height: number, target?: TargetBox) {
-  if (!width || !height) throw new Error("画面还没准备好，请稍后再试。");
+function makeJpeg(source: CanvasImageSource, width: number, height: number, target?: TargetBox, locale: Locale = "en") {
+  if (!width || !height) {
+    throw new Error(locale === "zh" ? "画面还没准备好，请稍后再试。" : "Frame is not ready yet. Please try again.");
+  }
   const pad = 0.22;
   const left = target ? Math.max(0, target.x - target.width * pad) : 0;
   const top = target ? Math.max(0, target.y - target.height * pad) : 0;
@@ -44,7 +57,9 @@ function makeJpeg(source: CanvasImageSource, width: number, height: number, targ
   canvas.height = Math.max(1, Math.round(sourceHeight * scale));
 
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error("浏览器无法处理这张图片。");
+  if (!context) {
+    throw new Error(locale === "zh" ? "浏览器无法处理这张图片。" : "Browser could not process this image.");
+  }
   context.fillStyle = "#16161c";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(
@@ -55,17 +70,19 @@ function makeJpeg(source: CanvasImageSource, width: number, height: number, targ
   return data.length <= 2_800_024 ? data : canvas.toDataURL("image/jpeg", 0.64);
 }
 
-export function captureFrame(video: HTMLVideoElement, target?: TargetBox) {
+export function captureFrame(video: HTMLVideoElement, target?: TargetBox, locale: Locale = "en") {
   if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-    throw new Error("画面还没准备好，请稍后再试。");
+    throw new Error(locale === "zh" ? "画面还没准备好，请稍后再试。" : "Frame is not ready yet. Please try again.");
   }
-  return makeJpeg(video, video.videoWidth, video.videoHeight, target);
+  return makeJpeg(video, video.videoWidth, video.videoHeight, target, locale);
 }
 
-export async function loadPhoto(file: File) {
-  if (file.size > MAX_IMAGE_SIZE) throw new Error("请选择 20 MB 以内的图片。");
+export async function loadPhoto(file: File, locale: Locale = "en") {
+  if (file.size > MAX_IMAGE_SIZE) {
+    throw new Error(locale === "zh" ? "请选择 20 MB 以内的图片。" : "Please choose an image under 20 MB.");
+  }
   if ((file.type && !file.type.startsWith("image/")) || file.type === "image/svg+xml") {
-    throw new Error("请选择相机照片或 JPG、PNG、WebP 等图片。");
+    throw new Error(locale === "zh" ? "请选择相机照片或 JPG、PNG、WebP 等图片。" : "Please choose a camera photo or JPG, PNG, or WebP image.");
   }
   const url = URL.createObjectURL(file);
   try {
@@ -74,9 +91,9 @@ export async function loadPhoto(file: File) {
     try {
       await image.decode();
     } catch {
-      throw new Error("浏览器无法读取这张图片。请试试 JPG、PNG 或 WebP。");
+      throw new Error(locale === "zh" ? "浏览器无法读取这张图片。请试试 JPG、PNG 或 WebP。" : "Browser could not read this image. Try JPG, PNG, or WebP.");
     }
-    return makeJpeg(image, image.naturalWidth, image.naturalHeight);
+    return makeJpeg(image, image.naturalWidth, image.naturalHeight, undefined, locale);
   } finally {
     URL.revokeObjectURL(url);
   }

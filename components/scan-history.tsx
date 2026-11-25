@@ -1,33 +1,14 @@
 "use client";
 
 import { History, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { readScanHistory, type HistoryEntry } from "@/lib/history";
+import { translations, type Locale } from "@/lib/i18n";
 import { ScanReport } from "./scan-report";
 
 const PAGE_SIZE = 12;
-const timeFormat = new Intl.DateTimeFormat("zh-CN", {
-  year: "numeric", month: "2-digit", day: "2-digit",
-  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-});
-const listTimeFormat = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-});
 
-function sourceLabel(entry: HistoryEntry) {
-  return entry.source === "camera" ? "摄像头" : "图片";
-}
-
-function historyStatus(entry: HistoryEntry, activeId?: string) {
-  switch (entry.outcome?.status) {
-    case "completed": return "已识别";
-    case "failed": return "识别失败";
-    case "cancelled": return "已取消";
-    default: return entry.id === activeId ? "识别中" : "未完成";
-  }
-}
-
-function HistoryFrame({ blob, thumbnail = false }: { blob: Blob; thumbnail?: boolean }) {
+function HistoryFrame({ blob, thumbnail = false, alt }: { blob: Blob; thumbnail?: boolean; alt: string }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
     const objectUrl = URL.createObjectURL(blob);
@@ -37,22 +18,32 @@ function HistoryFrame({ blob, thumbnail = false }: { blob: Blob; thumbnail?: boo
 
   const className = thumbnail ? "history-thumbnail" : "history-frame";
   return url
-    ? <img className={className} src={url} alt={thumbnail ? "" : "扫描关键帧"} />
+    ? <img className={className} src={url} alt={thumbnail ? "" : alt} />
     : <span className={className} aria-hidden />;
 }
 
 export function ScanHistory({
-  revision, activeId, onClose,
+  locale, revision, activeId, onClose,
 }: {
+  locale: Locale;
   revision: number;
   activeId?: string;
   onClose: () => void;
 }) {
+  const t = translations[locale].history;
   const dialog = useRef<HTMLDialogElement>(null);
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
+
+  const timeFormat = useMemo(() => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }), [locale]);
+  const listTimeFormat = useMemo(() => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }), [locale]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -67,10 +58,23 @@ export function ScanHistory({
       setEntries(history);
       setError("");
     }, () => {
-      if (!ignore) setError("暂时无法读取此浏览器的扫描记录。");
+      if (!ignore) setError(t.readError);
     });
     return () => { ignore = true; };
-  }, [revision]);
+  }, [revision, t.readError]);
+
+  function sourceLabel(entry: HistoryEntry) {
+    return entry.source === "camera" ? t.sourceCamera : t.sourcePhoto;
+  }
+
+  function historyStatus(entry: HistoryEntry) {
+    switch (entry.outcome?.status) {
+      case "completed": return t.statusCompleted;
+      case "failed": return t.statusFailed;
+      case "cancelled": return t.statusCancelled;
+      default: return entry.id === activeId ? t.statusScanning : t.statusIncomplete;
+    }
+  }
 
   function select(id: string | null) {
     setSelectedId(id);
@@ -85,10 +89,10 @@ export function ScanHistory({
       <header className="history-heading">
         <div className="dialog-icon"><History size={21} aria-hidden /></div>
         <div>
-          <h2 id="history-title">历史记录</h2>
-          <p className="muted">关键帧和结果保存在当前浏览器。</p>
+          <h2 id="history-title">{t.title}</h2>
+          <p className="muted">{t.subtitle}</p>
         </div>
-        <button type="button" className="icon-button" aria-label="关闭历史记录" onClick={onClose}>
+        <button type="button" className="icon-button" aria-label={t.closeAria} onClick={onClose}>
           <X size={21} aria-hidden />
         </button>
       </header>
@@ -98,16 +102,21 @@ export function ScanHistory({
       {selected ? (
         <>
           <div className="history-detail-top">
-            <button className="button text-button" onClick={() => select(null)}>返回列表</button>
+            <button className="button text-button" onClick={() => select(null)}>{t.backToList}</button>
             <span className="muted">{sourceLabel(selected)} · {timeFormat.format(selected.createdAt)}</span>
           </div>
-          <HistoryFrame blob={selected.frame} />
+          <HistoryFrame blob={selected.frame} alt={t.frameAlt} />
           {selectedOutcome?.status === "completed" ? (
-            <ScanReport record={{ ...selectedOutcome.reply, model: selected.model }} busy={false} awaiting="" />
+            <ScanReport
+              locale={locale}
+              record={{ ...selectedOutcome.reply, model: selected.model, lang: selected.lang ?? "zh" }}
+              busy={false}
+              awaiting=""
+            />
           ) : (
             <div className="history-outcome" role="status">
-              <strong>{historyStatus(selected, activeId)}</strong>
-              <p className="muted">{selectedOutcome?.message ?? "此记录保留了识别时的关键帧。"}</p>
+              <strong>{historyStatus(selected)}</strong>
+              <p className="muted">{selectedOutcome?.message ?? t.fallbackMessage}</p>
             </div>
           )}
         </>
@@ -117,10 +126,10 @@ export function ScanHistory({
             {entries.slice(0, limit).map((entry) => (
               <li key={entry.id}>
                 <button type="button" className="history-entry" onClick={() => select(entry.id)}>
-                  <HistoryFrame blob={entry.frame} thumbnail />
+                  <HistoryFrame blob={entry.frame} thumbnail alt={t.frameAlt} />
                   <span className="history-entry-content">
                     <strong>{entry.outcome?.status === "completed"
-                      ? entry.outcome.reply.result.name : sourceLabel(entry) + "扫描"}</strong>
+                      ? entry.outcome.reply.result.name : sourceLabel(entry) + t.scanSuffix}</strong>
                     <span className="history-entry-meta">
                       <time dateTime={new Date(entry.createdAt).toISOString()}>
                         {listTimeFormat.format(entry.createdAt)}
@@ -129,17 +138,17 @@ export function ScanHistory({
                     </span>
                   </span>
                   <span className={"pill " + (entry.outcome?.status === "completed" ? "connected" : "frame-label")}>
-                    {historyStatus(entry, activeId)}
+                    {historyStatus(entry)}
                   </span>
                 </button>
               </li>
             ))}
           </ul>
           {entries.length > limit && <button type="button" className="button secondary history-more"
-            onClick={() => setLimit((count) => count + PAGE_SIZE)}>显示更多</button>}
+            onClick={() => setLimit((count) => count + PAGE_SIZE)}>{t.showMore}</button>}
         </>
       ) : !error && (
-        <p className="history-empty" role="status">{entries ? "小本本还空着，扫一次就有记录。" : "正在读取历史记录…"}</p>
+        <p className="history-empty" role="status">{entries ? t.empty : t.loading}</p>
       )}
     </dialog>
   );

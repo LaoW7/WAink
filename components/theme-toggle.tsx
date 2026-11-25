@@ -3,8 +3,11 @@
 import { Moon, Sun } from "lucide-react";
 import { useEffect } from "react";
 import { THEME_STORAGE_KEY } from "@/lib/appearance";
+import { translations, type Locale } from "@/lib/i18n";
 
-export function ThemeToggle() {
+export function ThemeToggle({ locale = "en" }: { locale?: Locale }) {
+  const t = translations[locale];
+
   useEffect(() => {
     try {
       document.documentElement.dataset.theme = localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
@@ -25,12 +28,12 @@ export function ThemeToggle() {
   }
 
   return (
-    <button type="button" className="button settings-button theme-toggle" onClick={toggle} title="切换黑白主题">
+    <button type="button" className="button settings-button theme-toggle" onClick={toggle} title={t.toggleThemeTitle}>
       <span className="switch-to-light">
-        <Sun size={18} aria-hidden /><span className="sr-only">切换到白色主题</span>
+        <Sun size={18} aria-hidden /><span className="sr-only">{t.switchToLight}</span>
       </span>
       <span className="switch-to-dark">
-        <Moon size={18} aria-hidden /><span className="sr-only">切换到黑色主题</span>
+        <Moon size={18} aria-hidden /><span className="sr-only">{t.switchToDark}</span>
       </span>
     </button>
   );

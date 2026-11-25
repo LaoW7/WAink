@@ -1,3 +1,4 @@
+import type { Locale } from "./i18n";
 import type { ScanReply } from "./scan";
 
 export type ScanSource = "camera" | "photo";
@@ -11,6 +12,7 @@ export type HistoryEntry = {
   createdAt: number;
   source: ScanSource;
   model: string;
+  lang?: Locale;
   frame: Blob;
   outcome?: ScanOutcome;
 };
