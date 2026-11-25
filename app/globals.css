@@ -609,6 +609,23 @@ svg { flex-shrink: 0; }
 .select-shell svg { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--muted); }
 .secret-field input { padding-right: 46px; }
 .secret-field .icon-button { position: absolute; top: 1px; right: 2px; }
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: .85rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+  min-height: auto;
+  margin: 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
 .privacy-note { display: flex; align-items: center; gap: 7px; margin: 10px 0; color: var(--muted); font-size: .84rem; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
 

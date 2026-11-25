@@ -9,6 +9,7 @@ type TrialBindings = {
   TRIAL_BASE_URL?: string;
   TRIAL_MODEL?: string;
   TRIAL_SCANS_PER_IP_PER_HOUR?: string;
+  TRIAL_SCANS_GLOBAL_PER_HOUR?: string;
   TRIAL_LOGIN_LIMIT?: RateLimit;
   TRIAL_SCAN_QUOTA?: DurableObjectNamespace<TrialQuota>;
 };
@@ -24,21 +25,41 @@ export function readTrialConfig() {
   const baseUrl = bindings.TRIAL_BASE_URL?.trim();
   const model = scanInputSchema.shape.model.safeParse(bindings.TRIAL_MODEL);
   const hourlyLimit = Number(bindings.TRIAL_SCANS_PER_IP_PER_HOUR ?? "20");
+  const globalHourlyLimit = Number(bindings.TRIAL_SCANS_GLOBAL_PER_HOUR ?? "200");
   const loginLimit = bindings.TRIAL_LOGIN_LIMIT;
   const scanQuota = bindings.TRIAL_SCAN_QUOTA;
   if (!password?.trim() || password.length > 256 || !secret || secret.length < 32 ||
       !apiKey || !/^[\x21-\x7E]{1,2048}$/.test(apiKey) || !baseUrl || !model.success || !loginLimit || !scanQuota ||
-      !Number.isSafeInteger(hourlyLimit) || hourlyLimit < 1) {
+      !Number.isSafeInteger(hourlyLimit) || hourlyLimit < 1 ||
+      !Number.isSafeInteger(globalHourlyLimit) || globalHourlyLimit < 1) {
     return null;
   }
   try {
-    return { password, secret, apiKey, endpoint: completionEndpoint(baseUrl), model: model.data, hourlyLimit, loginLimit, scanQuota };
+    return {
+      password,
+      secret,
+      apiKey,
+      endpoint: completionEndpoint(baseUrl),
+      model: model.data,
+      hourlyLimit,
+      globalHourlyLimit,
+      loginLimit,
+      scanQuota,
+    };
   } catch {
     return null;
   }
 }
 
 type TrialConfig = NonNullable<ReturnType<typeof readTrialConfig>>;
+
+export function isSameOriginRequest(request: Request) {
+  const expectedOrigin = new URL(request.url).origin;
+  const origin = request.headers.get("origin");
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "same-origin") return false;
+  return origin ? origin === expectedOrigin : fetchSite === "same-origin";
+}
 
 export function trialRequestIsSecure(request: Request) {
   const url = new URL(request.url);
@@ -63,9 +84,19 @@ function encodeSignature(signature: ArrayBuffer) {
 }
 
 export async function consumeTrialScan(request: Request, config: TrialConfig) {
+  const key = await signingKey(config);
   const ip = request.headers.get("cf-connecting-ip") ?? "local";
-  const identifier = await crypto.subtle.sign("HMAC", await signingKey(config), encoder.encode("trial-quota:" + ip));
-  return config.scanQuota.getByName(encodeSignature(identifier)).consume(config.hourlyLimit);
+  const ipIdentifier = await crypto.subtle.sign("HMAC", key, encoder.encode("trial-quota:" + ip));
+  const ipQuota = await config.scanQuota.getByName(encodeSignature(ipIdentifier)).consume(config.hourlyLimit);
+  if (!ipQuota.allowed) {
+    return { allowed: false as const, retryAfter: ipQuota.retryAfter, scope: "ip" as const };
+  }
+  const globalIdentifier = await crypto.subtle.sign("HMAC", key, encoder.encode("trial-quota:global"));
+  const globalQuota = await config.scanQuota.getByName(encodeSignature(globalIdentifier)).consume(config.globalHourlyLimit);
+  if (!globalQuota.allowed) {
+    return { allowed: false as const, retryAfter: globalQuota.retryAfter, scope: "global" as const };
+  }
+  return { allowed: true as const, retryAfter: 0, scope: null };
 }
 
 export async function trialPasswordMatches(password: string, config: TrialConfig) {

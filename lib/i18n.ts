@@ -27,9 +27,9 @@ export function htmlLang(locale: Locale) {
 
 export const translations = {
   en: {
-    brand: "AI Peek",
+    brand: "WAiNK",
     tagline: "Peek at everything you want to know.",
-    pageTitle: "AI Peek",
+    pageTitle: "WAiNK",
     historyButton: "History",
     settingsButton: "Model Settings",
     switchToLanguage: "中文",
@@ -179,7 +179,9 @@ export const translations = {
       apiKeyPlaceholder: "Paste your API Key",
       hideKey: "Hide Key",
       showKey: "Show Key",
-      privacyNote: "Your key stays in this browser and can be cleared here.",
+      rememberKeyLabel: "Remember key in this browser (uncheck on shared devices)",
+      privacyNoteSession: "Key stays in this tab session only and clears when closed.",
+      privacyNotePersistent: "Key is saved in this browser and can be cleared here anytime.",
       clearButton: "Clear",
       saveButton: "Enable Model",
       errInvalidKey: "Please enter a valid API Key.",
@@ -364,7 +366,9 @@ export const translations = {
       apiKeyPlaceholder: "粘贴你的 API Key",
       hideKey: "隐藏 Key",
       showKey: "显示 Key",
-      privacyNote: "Key 保存在当前浏览器，可在此清除。",
+      rememberKeyLabel: "在此浏览器记住 Key（公共设备建议取消勾选）",
+      privacyNoteSession: "Key 仅保留在当前标签页会话中，关闭后自动清除。",
+      privacyNotePersistent: "Key 保存在当前浏览器，可随时在此清除。",
       clearButton: "清除配置",
       saveButton: "启用模型",
       errInvalidKey: "请输入有效的 API Key。",

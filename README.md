@@ -1,4 +1,4 @@
-# AI Peek
+# WAiNK
 
 **English** | [简体中文](README.zh-CN.md)
 
@@ -23,7 +23,7 @@ Create an empty **Private** repository on GitHub. If you extracted the project f
 
 ```sh
 git add .
-git commit -m "Add AI Peek Workers release"
+git commit -m "Add WAiNK Workers release"
 git remote add origin "https://github.com/YOUR_ACCOUNT/YOUR_PRIVATE_REPO.git"
 git push -u origin main
 ```
@@ -71,6 +71,7 @@ After deploying the Worker, configure runtime variables under **Settings → Var
 | `TRIAL_BASE_URL` | Text | HTTPS OpenAI-compatible base URL or full `/chat/completions` URL |
 | `TRIAL_MODEL` | Text | Vision model ID used on the server |
 | `TRIAL_SCANS_PER_IP_PER_HOUR` | Text | Allowed scans per IP in a rolling 1-hour window (default `20`, positive integer) |
+| `TRIAL_SCANS_GLOBAL_PER_HOUR` | Text | Optional site-wide trial scan cap per rolling 1-hour window (default `200`, positive integer) |
 
 For example, when using Google Gemini for the trial model, set `TRIAL_BASE_URL` to `https://generativelanguage.googleapis.com/v1beta/openai` and `TRIAL_MODEL` to a vision model available to that key. You can generate a random signing secret with:
 

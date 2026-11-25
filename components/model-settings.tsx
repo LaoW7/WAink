@@ -12,15 +12,16 @@ import type { TrialStatus } from "@/lib/trial-client";
 import { TrialSettings } from "./trial-settings";
 
 export function ModelSettings({
-  locale, config, trial, preferTrial, onTrialChange, onClose, onSave, onClear,
+  locale, config, persistKey, trial, preferTrial, onTrialChange, onClose, onSave, onClear,
 }: {
   locale: Locale;
   config: Credentials | null;
+  persistKey: boolean;
   trial: TrialStatus;
   preferTrial: boolean;
   onTrialChange: (status: TrialStatus) => void;
   onClose: () => void;
-  onSave: (config: Credentials) => void;
+  onSave: (config: Credentials, persistKey: boolean) => void;
   onClear: () => void;
 }) {
   const t = translations[locale].settings;
@@ -29,6 +30,7 @@ export function ModelSettings({
   const [draft, setDraft] = useState<Credentials>(
     () => config ?? { provider: "auto", model: providers.auto.model, apiKey: "", baseUrl: "" },
   );
+  const [rememberKey, setRememberKey] = useState(persistKey);
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState("");
   const [trialTab, setTrialTab] = useState(preferTrial || !config);
@@ -95,7 +97,7 @@ export function ModelSettings({
       setError(cause instanceof Error ? cause.message : t.errCheckEndpoint);
       return;
     }
-    onSave({ ...draft, apiKey, model, baseUrl });
+    onSave({ ...draft, apiKey, model, baseUrl }, rememberKey);
   }
 
   return (
@@ -181,8 +183,12 @@ export function ModelSettings({
               {showKey ? <EyeOff size={19} aria-hidden /> : <Eye size={19} aria-hidden />}
             </button>
           </div>
+          <label className="checkbox-field">
+            <input type="checkbox" checked={rememberKey} onChange={(event) => setRememberKey(event.target.checked)} />
+            <span>{t.rememberKeyLabel}</span>
+          </label>
         </div>
-        <p className="privacy-note"><KeyRound size={15} aria-hidden /> {t.privacyNote}</p>
+        <p className="privacy-note"><KeyRound size={15} aria-hidden /> {rememberKey ? t.privacyNotePersistent : t.privacyNoteSession}</p>
         {error && <p className="error-message" role="alert">{error}</p>}
         <div className="dialog-actions">
           {config && <button type="button" className="button text-button" onClick={onClear}>{t.clearButton}</button>}

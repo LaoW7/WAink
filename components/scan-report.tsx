@@ -136,9 +136,9 @@ export function ScanReport({
     <section className="panel report" aria-labelledby={titleId} aria-busy={busy}>
       <div className="panel-heading">
         <h2 id={titleId}><ClipboardList aria-hidden />{t.heading}</h2>
-        {(record || onDismiss) && (
+        {(record?.model || onDismiss) && (
           <div className="report-heading-actions">
-            {record && <span className={record.model ? "pill connected" : "pill sample"}>{record.model ? t.pillAi : t.pillSample}</span>}
+            {record?.model && <span className="pill connected">{t.pillAi}</span>}
             {onDismiss && (
               <button type="button" className="icon-button" aria-label={t.dismissAria} onClick={onDismiss}>
                 <X size={20} aria-hidden />

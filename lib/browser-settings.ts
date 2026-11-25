@@ -21,31 +21,60 @@ const preferencesSchema = z.object({
   note: z.string().max(280),
 });
 
+function parseStoredModel(raw: string): Credentials | null {
+  const parsed = modelSchema.parse(JSON.parse(raw));
+  if (parsed.provider === "custom") completionEndpoint(parsed.baseUrl);
+  if (parsed.provider === "custom" || resolveProvider(parsed.provider, parsed.model)) return parsed;
+  return null;
+}
+
 export function readBrowserSettings() {
-  const savedModel = localStorage.getItem(MODEL_KEY);
-  const savedPreferences = localStorage.getItem(PREFERENCES_KEY);
   let config: Credentials | null = null;
+  let persistKey = false;
   let preferences = defaultScanPreferences;
   try {
-    if (savedModel) {
-      const parsed = modelSchema.parse(JSON.parse(savedModel));
-      if (parsed.provider === "custom") completionEndpoint(parsed.baseUrl);
-      if (parsed.provider === "custom" || resolveProvider(parsed.provider, parsed.model)) config = parsed;
+    const sessionModel = sessionStorage.getItem(MODEL_KEY);
+    const localModel = localStorage.getItem(MODEL_KEY);
+    if (sessionModel) {
+      config = parseStoredModel(sessionModel);
+      persistKey = false;
+    } else if (localModel) {
+      config = parseStoredModel(localModel);
+      persistKey = !!config;
     }
   } catch {
     // Ignore invalid or obsolete entries while allowing the model to be configured again.
   }
   try {
+    const savedPreferences = localStorage.getItem(PREFERENCES_KEY);
     if (savedPreferences) preferences = preferencesSchema.parse(JSON.parse(savedPreferences));
   } catch {
     // A broken scan preference should not prevent the model configuration from loading.
   }
-  return { config, preferences, preferTrial: localStorage.getItem(TRIAL_PREFERENCE_KEY) === "1" };
+  let preferTrial = false;
+  try {
+    preferTrial = localStorage.getItem(TRIAL_PREFERENCE_KEY) === "1";
+  } catch {
+    // Ignore storage access failure.
+  }
+  return { config, persistKey, preferences, preferTrial };
 }
 
-export function writeModelSettings(config: Credentials | null) {
-  if (config) localStorage.setItem(MODEL_KEY, JSON.stringify(config));
-  else localStorage.removeItem(MODEL_KEY);
+export function writeModelSettings(config: Credentials | null, persistKey = false) {
+  try {
+    sessionStorage.removeItem(MODEL_KEY);
+  } catch {
+    // Ignore when sessionStorage is unavailable.
+  }
+  try {
+    localStorage.removeItem(MODEL_KEY);
+  } catch (error) {
+    if (!config) throw error;
+  }
+  if (!config) return;
+  const payload = JSON.stringify(config);
+  if (persistKey) localStorage.setItem(MODEL_KEY, payload);
+  else sessionStorage.setItem(MODEL_KEY, payload);
 }
 
 export function writeScanPreferences(preferences: ScanPreferences) {

@@ -27,6 +27,7 @@ const SAMPLE: Frame = { kind: "sample" };
 export default function ScannerPage() {
   const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
   const [config, setConfig] = useState<Credentials | null>(null);
+  const [persistKey, setPersistKey] = useState(false);
   const [trial, setTrial] = useState(inactiveTrial);
   const [preferTrial, setPreferTrial] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
@@ -78,6 +79,7 @@ export default function ScannerPage() {
     try {
       const saved = readBrowserSettings();
       setConfig(saved.config);
+      setPersistKey(saved.persistKey);
       setPreferences(saved.preferences);
       setPreferTrial(saved.preferTrial);
     } catch {
@@ -110,10 +112,11 @@ export default function ScannerPage() {
     setStorageWarning("");
   }
 
-  function updateConfig(next: Credentials | null) {
+  function updateConfig(next: Credentials | null, persist = persistKey) {
     setConfig(next);
+    setPersistKey(next ? persist : false);
     try {
-      writeModelSettings(next);
+      writeModelSettings(next, persist);
     } catch {
       setStorageWarning(next ? t.warnSaveConfigOk : t.warnClearConfigFail);
     }
@@ -462,10 +465,12 @@ export default function ScannerPage() {
           <section className="panel scanner" aria-labelledby="camera-title">
             <div className="panel-heading">
               <h2 id="camera-title" ref={scannerHeading} tabIndex={-1}><Crosshair aria-hidden />{t.viewfinderTitle}</h2>
-              <span className={videoActive ? "pill connected" : "pill frame-label"}>
-                {videoActive && <span className="indicator" />}
-                {videoActive ? t.liveFeed : captured ? t.cameraOff : filePreview ? t.photoLoaded : t.sampleFrame}
-              </span>
+              {(videoActive || captured || filePreview) && (
+                <span className={videoActive ? "pill connected" : "pill frame-label"}>
+                  {videoActive && <span className="indicator" />}
+                  {videoActive ? t.liveFeed : captured ? t.cameraOff : t.photoLoaded}
+                </span>
+              )}
             </div>
 
             <div className={"viewfinder " + (filePreview ? "uploaded" : "")}>
@@ -580,7 +585,7 @@ export default function ScannerPage() {
         </footer>
       </main>
 
-      {settingsOpen && <ModelSettings locale={locale} config={config} trial={trial} preferTrial={preferTrial} onClose={() => setSettingsOpen(false)}
+      {settingsOpen && <ModelSettings locale={locale} config={config} persistKey={persistKey} trial={trial} preferTrial={preferTrial} onClose={() => setSettingsOpen(false)}
         onTrialChange={(status) => {
           stopScan();
           setTrial(status);
@@ -588,8 +593,8 @@ export default function ScannerPage() {
           setSettingsOpen(false);
           setError("");
         }}
-        onSave={(next) => { updateConfig(next); updateTrialPreference(false); setSettingsOpen(false); setError(""); }}
-        onClear={() => { stopScan(); updateConfig(null); setSettingsOpen(false); setError(""); }} />}
+        onSave={(next, persist) => { updateConfig(next, persist); updateTrialPreference(false); setSettingsOpen(false); setError(""); }}
+        onClear={() => { stopScan(); updateConfig(null, false); setSettingsOpen(false); setError(""); }} />}
       {historyOpen && <ScanHistory locale={locale} revision={historyRevision} activeId={request.current?.id}
         onClose={() => setHistoryOpen(false)} />}
       {resultSheetOpen && displayRecord && !settingsOpen && !historyOpen && (

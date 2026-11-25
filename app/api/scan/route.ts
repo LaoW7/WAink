@@ -1,7 +1,7 @@
 import type { Locale } from "@/lib/i18n";
 import { isProvider, resolveModelNode } from "@/lib/model-providers";
 import { callVision, readScanRequest, ScanError, supportedLookup } from "@/lib/scan";
-import { consumeTrialScan, hasTrialSession, readTrialConfig } from "@/lib/trial";
+import { consumeTrialScan, hasTrialSession, isSameOriginRequest, readTrialConfig } from "@/lib/trial";
 
 const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
@@ -15,9 +15,7 @@ export async function POST(request: Request) {
   const json = (value: unknown, status = 200) => Response.json(value, { status, headers });
 
   try {
-    const origin = request.headers.get("origin");
-    if (request.headers.get("sec-fetch-site") === "cross-site" ||
-        (origin && origin !== new URL(request.url).origin)) {
+    if (!isSameOriginRequest(request)) {
       return json({ error: msg(lang, "Please submit requests from the scanner page.", "请从扫描页面发起请求。") }, 403);
     }
     if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) {
@@ -35,13 +33,18 @@ export async function POST(request: Request) {
       const quota = await consumeTrialScan(request, trial);
       if (!quota.allowed) {
         const minutes = Math.ceil(quota.retryAfter / 60);
-        return Response.json({
-          error: msg(
-            input.lang,
-            `This IP has used all ${trial.hourlyLimit} trial scans for the past hour. Try again in ~${minutes} min.`,
-            `此 IP 最近一小时的 ${trial.hourlyLimit} 次体验扫描已用完，请约 ${minutes} 分钟后再试。`,
-          ),
-        }, {
+        const message = quota.scope === "global"
+          ? msg(
+              input.lang,
+              `The site-wide hourly trial scan limit has been reached. Try again in ~${minutes} min or use your own API key.`,
+              `本站当前小时的体验扫描总额度已用完，请约 ${minutes} 分钟后再试，或在模型设置中使用自己的 API Key。`,
+            )
+          : msg(
+              input.lang,
+              `This IP has used all ${trial.hourlyLimit} trial scans for the past hour. Try again in ~${minutes} min.`,
+              `此 IP 最近一小时的 ${trial.hourlyLimit} 次体验扫描已用完，请约 ${minutes} 分钟后再试。`,
+            );
+        return Response.json({ error: message }, {
           status: 429, headers: { ...headers, "Retry-After": String(quota.retryAfter) },
         });
       }

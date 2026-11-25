@@ -1,4 +1,4 @@
-# AI爽窥 (AI Peek)
+# AI爽窥 (WAiNK)
 
 [English](README.md) | **简体中文**
 
@@ -23,7 +23,7 @@ npm run dev
 
 ```sh
 git add .
-git commit -m "Add AI Peek Workers release"
+git commit -m "Add WAiNK Workers release"
 git remote add origin "https://github.com/YOUR_ACCOUNT/YOUR_PRIVATE_REPO.git"
 git push -u origin main
 ```
@@ -71,6 +71,7 @@ npm run deploy
 | `TRIAL_BASE_URL` | Text | HTTPS 的 OpenAI 兼容接口地址，可填写基础地址或完整的 `/chat/completions` 地址 |
 | `TRIAL_MODEL` | Text | 服务端使用的视觉模型 ID |
 | `TRIAL_SCANS_PER_IP_PER_HOUR` | Text | 同一 IP 滚动一小时内允许的扫描次数，默认 `20`，可填正整数 |
+| `TRIAL_SCANS_GLOBAL_PER_HOUR` | Text | 可选，全站每滚动一小时的体验扫描总上限，默认 `200`，可填正整数 |
 
 例如，体验模型使用 Google Gemini 时，可把 `TRIAL_BASE_URL` 设为 `https://generativelanguage.googleapis.com/v1beta/openai`，模型名填该 Key 可用的视觉模型。生成随机签名密钥可以用下面的命令，然后把输出填入 Secret。
 

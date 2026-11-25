@@ -3,10 +3,10 @@ import { themeBootstrap } from "@/lib/appearance";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Peek",
+  title: "WAiNK",
   description: "Peek at everything you want to know.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "AI Peek" },
+  appleWebApp: { capable: true, title: "WAiNK" },
   icons: {
     icon: { url: "/app-icon-64.png", sizes: "64x64", type: "image/png" },
     shortcut: "/app-icon-64.png",

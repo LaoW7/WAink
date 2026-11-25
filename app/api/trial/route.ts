@@ -1,6 +1,6 @@
 import type { Locale } from "@/lib/i18n";
 import { readBody, ScanError } from "@/lib/scan";
-import { clearTrialCookie, createTrialCookie, hasTrialSession, readTrialConfig, trialPasswordMatches, trialRequestIsSecure } from "@/lib/trial";
+import { clearTrialCookie, createTrialCookie, hasTrialSession, isSameOriginRequest, readTrialConfig, trialPasswordMatches, trialRequestIsSecure } from "@/lib/trial";
 
 function msg(lang: Locale, en: string, zh: string) {
   return lang === "zh" ? zh : en;
@@ -18,9 +18,7 @@ function reply(value: unknown, status = 200, setCookie?: string) {
 }
 
 function allowedOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  return request.headers.get("sec-fetch-site") !== "cross-site" &&
-    (!origin || origin === new URL(request.url).origin) && trialRequestIsSecure(request);
+  return isSameOriginRequest(request) && trialRequestIsSecure(request);
 }
 
 export async function GET(request: Request) {
