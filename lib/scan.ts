@@ -46,10 +46,10 @@ export const resultSchema = z.object({
   details: z.array(z.object({ label: shortText, value: shortText })).max(7),
   valuation: price.nullable(),
   registrationPrice: price.nullable(),
-  security: z.object({ alarm: vehicleFeature, tracker: vehicleFeature }).nullable(),
+  security: z.object({ alarm: vehicleFeature, access: vehicleFeature, tracker: vehicleFeature }).nullable(),
 }).superRefine((result, context) => {
   if (result.category === "vehicle" && !result.security) {
-    context.addIssue({ code: "custom", path: ["security"], message: "车辆缺少防盗与追踪器字段" });
+    context.addIssue({ code: "custom", path: ["security"], message: "车辆缺少安保、门锁进入或定位字段" });
   }
 }).transform((result) => ({
   ...result,
@@ -93,24 +93,25 @@ export const SCAN_PROMPT = `你为一款中文图像扫描应用生成一份目�
   "category": "vehicle|landmark|object|unknown",
   "name": "名称",
   "subtitle": "型号、年代或类别，未知用空字符串",
-  "summary": "不超过80字的图鉴式介绍，说明最关键的不确定性",
+  "summary": "不超过80字的街头复古游戏风幽默锐评，带点画面线索或最关键的不确定性",
   "confidence": "high|medium|low",
   "details": [{"label":"短标签","value":"可见特征、车型资料或注明推测的配置"}],
   "valuation": {"min": 0, "max": 0, "basis": "参考地区、假设与依据"},
   "registrationPrice": {"min": 0, "max": 0, "basis": "参考地区、假设与依据"},
   "security": {
-    "alarm": {"value":"防盗装置判断","source":"visible|inferred|unknown","confidence":"high|medium|low","evidence":"一句判断依据"},
-    "tracker": {"value":"追踪器或原厂远程定位功能判断","source":"visible|inferred|unknown","confidence":"high|medium|low","evidence":"一句判断依据"}
+    "alarm": {"value":"原厂警报与安保配置判断","source":"visible|inferred|unknown","confidence":"high|medium|low","evidence":"一句判断依据"},
+    "access": {"value":"原厂门锁启动体系与故障检修特征","source":"visible|inferred|unknown","confidence":"high|medium|low","evidence":"一句判断依据"},
+    "tracker": {"value":"原厂车联网与远程寻车定位判断","source":"visible|inferred|unknown","confidence":"high|medium|low","evidence":"一句判断依据"}
   }
 }
 
 具体规则：
 - 车辆先找最可能的品牌、车系、年代和代际。结合这个候选，主动补全典型车身、动力和原厂配置。无法细分时，优先给合理的区间或候选，推测的字段要标明。地标给地点特征；物品给品牌、品类和可见材质。最多 7 个 details。完全无法识别时 category=unknown。
-- 如果查询工具可用且已推定车系，优先检索该代车型的厂商手册、市场版本配置表和公开资料，重点核实原厂警报、电子防启动、车联网和失窃车辆定位服务。办证与估价有地区线索时优先参考公开资料。工具不可用或找不到对应资料时，用已知年款、同代车型、级别和常见原厂选装做有依据的概率判断，勿声称已经检索或引用虚构来源。
-- 每辆车分别给防盗装置与追踪器的最佳车型层面判断。若截图明示结果或设备明确可见，标 visible。若依据同代车型配置或公开资料推断，标 inferred，置信度取 low 或 medium。尽量给出具体配置和一句有用的依据，比如“可能配发动机电子防启动｜同代车型多数市场版本将防启动作为标配”或“可能支持原厂远程定位｜车联网套餐通常在指定版本提供”。配置不明也可给有依据的候选，例如“有车联网版本可能支持原厂定位”。只有车型、年代、类别都无法提供配置线索时才用 unknown、low、“配置待核对”。不要用“从外观无法判断”当作判断依据；直接说明采用的配置线索或缺少的年款/版本信息。车型资料与推测不能证实这台实车装有或没有某个隐藏或加装装置，不要给装置藏匿位置、解除或规避方法。
+- 如果查询工具可用且已推定车系，优先检索该代车型的厂商手册、维修保养资料和市场版本配置表，重点核实原厂警报、发动机电子防启动、车门进入与启动体系（如机械钥匙、遥控钥匙、无钥匙进入与一键启动、NFC卡片或手机数字钥匙，以及自驾途中车门或钥匙出现故障时的常规应急开启与售后检修方式）、车联网和远程寻车定位服务。办证与估价有地区线索时优先参考公开资料。工具不可用或找不到对应资料时，用已知年款、同代车型、级别和常见原厂选装做有依据的概率判断，勿声称已经检索或引用虚构来源。
+- 每辆车分别给 alarm（原厂安保与警报）、access（门锁启动体系及自驾故障应急检修特征）与 tracker（原厂定位与车联网）的最佳车型层面判断。若截图明示结果或外观结构明确可见（如门把手机械锁孔、隐藏式门把手、无钥匙感应区、B柱NFC刷卡区），标 visible。若依据同代车型配置或公开资料推断，标 inferred，置信度取 low 或 medium。access 字段从车主自驾用车与故障排查视角概括原厂进入与启动方式（例如“传统机械钥匙与锁芯｜失灵时需检查机械锁体或联系锁具维修”“无钥匙进入与一键启动｜钥匙亏电或感应故障可用隐藏机械钥匙或贴近应急感应区检修”“NFC卡片与手机数字钥匙｜异常时可刷B柱应急卡或通过官方App与售后排查”）。尽量给出具体配置和一句有用的依据，比如“可能配发动机电子防启动｜同代车型多数市场版本将其作为标配”或“可能支持原厂远程寻车｜车联网套餐通常在指定版本提供”。只有车型、年代、类别都无法提供配置线索时才用 unknown、low、“配置待核对”。不要用“从外观无法判断”当作判断依据；直接说明采用的配置线索或缺少的年款/版本信息。车型资料与推测仅作公开配置与常规保养参考，不能证实某台实车装有或没有某个隐藏或加装装置，也不要提供非授权开启或破坏性操作建议。
 - valuation 是粗略二手市场估价，registrationPrice 是粗略登记/上牌费用参考，不含购置税、保险、交易价格。金额为人民币数值，默认中国大陆，备注可缩小城市；basis 写参考地区和假设，缺少近期行情时标明估算。不要照抄示例数字。没有合理依据或不适用时输出 null。非车辆的 registrationPrice 和 security 必须为 null，地标或未知目标的 valuation 也必须为 null。
-- 截图明确标示为游戏内容时可以复述画面中读得出的防盗和追踪器状态，标明来自游戏画面。没有人民币市场对应时两个价格返回 null。
-- summary 用一两句俏皮的话概括画面线索。车型、配置、安防和金额字段使用简明的语言。
+- 截图明确标示为游戏内容（如都市开放世界或赛车游戏画面）时，可复述画面中显示的车辆安保、门锁进入类型和定位状态，并标明来自游戏画面。没有人民币市场对应时两个价格返回 null。
+- summary 用一两句幽默毒舌的街头车迷或经典都市游戏图鉴口吻概括画面线索与关键不确定性，可玩改装喷漆店、通缉星级、海滨飙车、车库收藏等轻松游戏梗，但保持风趣戏谑。车型、配置、安防和金额字段仍使用简明克制的语言。
 - JSON 字符串中不要写 URL、表格或私人信息，也不要附加通用免责声明。`;
 
 export type Lookup = "openai" | "qwen";
