@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ai-shuang-kui",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "keep_vars": true,
+  "ratelimits": [
+    { "name": "TRIAL_LOGIN_LIMIT", "namespace_id": "514301", "simple": { "limit": 5, "period": 60 } }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "TRIAL_SCAN_QUOTA", "class_name": "TrialQuota" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TrialQuota"] }]
+}

@@ -1,0 +1,7 @@
+# 本地预览可复制为 .dev.vars，再填入测试值。
+TRIAL_PASSWORD=
+TRIAL_SESSION_SECRET=
+TRIAL_API_KEY=
+TRIAL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+TRIAL_MODEL=gemini-3.8-flash
+TRIAL_SCANS_PER_IP_PER_HOUR=20
