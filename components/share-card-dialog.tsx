@@ -3,7 +3,19 @@
 import { Download, LoaderCircle, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { translations, type Locale } from "@/lib/i18n";
-import { renderShareCard, type ShareCardRecord } from "@/lib/share-card";
+import { isIosDevice, renderShareCard, type ShareCardRecord } from "@/lib/share-card";
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Failed to read image data URL."));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read image data URL."));
+    reader.readAsDataURL(blob);
+  });
+}
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -41,6 +53,11 @@ export function ShareCardDialog({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [iosDevice, setIosDevice] = useState(false);
+
+  useEffect(() => {
+    setIosDevice(isIosDevice());
+  }, []);
 
   useEffect(() => {
     const element = dialog.current;
@@ -50,27 +67,24 @@ export function ShareCardDialog({
 
   useEffect(() => {
     let active = true;
-    let objectUrl = "";
     setBlob(null);
     setPreviewUrl("");
     setError("");
     setNotice("");
 
-    void renderShareCard({ record, image, locale }).then(
-      (rendered) => {
+    void renderShareCard({ record, image, locale })
+      .then(async (rendered) => {
+        const dataUrl = await blobToDataUrl(rendered);
         if (!active) return;
-        objectUrl = URL.createObjectURL(rendered);
         setBlob(rendered);
-        setPreviewUrl(objectUrl);
-      },
-      () => {
+        setPreviewUrl(dataUrl);
+      })
+      .catch(() => {
         if (active) setError(t.renderError);
-      },
-    );
+      });
 
     return () => {
       active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [record, image, locale, t.renderError]);
 
@@ -86,11 +100,17 @@ export function ShareCardDialog({
     if (!blob || sharing) return;
     setNotice("");
     const file = new File([blob], filename, { type: "image/png" });
+    // Pass files only: iOS Safari hides/breaks "Save Image" when title or text is included.
+    const shareData = { files: [file] };
     const canShareFiles =
       typeof navigator.share === "function" &&
-      (!navigator.canShare || navigator.canShare({ files: [file] }));
+      (!navigator.canShare || navigator.canShare(shareData));
 
     if (!canShareFiles) {
+      if (iosDevice) {
+        setNotice(t.iosLongPressNotice);
+        return;
+      }
       downloadBlob(blob, filename);
       setNotice(t.fallbackSavedNotice);
       return;
@@ -98,12 +118,13 @@ export function ShareCardDialog({
 
     setSharing(true);
     try {
-      await navigator.share({
-        files: [file],
-        title: record.result.name,
-      });
+      await navigator.share(shareData);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
+      if (iosDevice) {
+        setNotice(t.iosLongPressNotice);
+        return;
+      }
       downloadBlob(blob, filename);
       setNotice(t.fallbackSavedNotice);
     } finally {
@@ -142,18 +163,35 @@ export function ShareCardDialog({
         ) : null}
       </div>
 
+      {iosDevice && previewUrl && !error && (
+        <p className="share-ios-hint">{t.iosPreviewHint}</p>
+      )}
       {error && <p className="error-message" role="alert">{error}</p>}
       {notice && <p className="share-status" role="status">{notice}</p>}
 
       <div className="dialog-actions share-actions">
-        <button type="button" className="button secondary" disabled={!blob} onClick={saveImage}>
-          <Download size={18} aria-hidden />
-          {t.saveButton}
-        </button>
-        <button type="button" className="button primary" disabled={!blob || sharing} onClick={() => void shareImage()}>
-          {sharing ? <LoaderCircle className="spin" size={18} aria-hidden /> : <Share2 size={18} aria-hidden />}
-          {sharing ? t.sharing : t.shareButton}
-        </button>
+        {iosDevice ? (
+          <button
+            type="button"
+            className="button primary share-ios-action"
+            disabled={!blob || sharing}
+            onClick={() => void shareImage()}
+          >
+            {sharing ? <LoaderCircle className="spin" size={18} aria-hidden /> : <Share2 size={18} aria-hidden />}
+            {sharing ? t.sharing : t.iosSaveShareButton}
+          </button>
+        ) : (
+          <>
+            <button type="button" className="button secondary" disabled={!blob} onClick={saveImage}>
+              <Download size={18} aria-hidden />
+              {t.saveButton}
+            </button>
+            <button type="button" className="button primary" disabled={!blob || sharing} onClick={() => void shareImage()}>
+              {sharing ? <LoaderCircle className="spin" size={18} aria-hidden /> : <Share2 size={18} aria-hidden />}
+              {sharing ? t.sharing : t.shareButton}
+            </button>
+          </>
+        )}
       </div>
     </dialog>
   );

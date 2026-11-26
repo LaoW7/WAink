@@ -4,6 +4,17 @@ import type { ScanReply, ScanResult } from "./scan";
 
 export type ShareCardRecord = ScanReply & { model?: string; lang?: Locale };
 
+export function isIosDevice(
+  nav?: Pick<Navigator, "userAgent" | "platform" | "maxTouchPoints">,
+): boolean {
+  const source = nav ?? (typeof navigator !== "undefined" ? navigator : undefined);
+  if (!source) return false;
+  const ua = source.userAgent || "";
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  // iPadOS 13+ desktop mode reports MacIntel with touch support.
+  return source.platform === "MacIntel" && (source.maxTouchPoints ?? 0) > 1;
+}
+
 const zhAmount = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 });
 const zhTenThousands = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 });
 const enAmount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });

@@ -625,6 +625,9 @@ svg { flex-shrink: 0; }
   max-height: min(56vh, 520px);
   object-fit: contain;
   border-radius: 8px;
+  -webkit-touch-callout: default;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .share-loading {
   display: grid;
@@ -638,6 +641,16 @@ svg { flex-shrink: 0; }
   margin: 8px 0 0;
   color: var(--muted);
   font-size: .85rem;
+}
+.share-ios-hint {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+.share-ios-action {
+  width: 100%;
 }
 
 .dialog-heading {
