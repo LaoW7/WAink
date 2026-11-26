@@ -431,6 +431,52 @@ svg { flex-shrink: 0; }
 .security-evidence { flex: 1 1 135px; }
 
 .price-row { align-items: baseline; }
+.price-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.info-trigger {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  transition: background-color .16s, color .16s, border-color .16s;
+}
+.info-trigger:hover, .info-trigger[aria-expanded="true"] {
+  color: var(--ink);
+  border-color: var(--outline);
+  background: var(--hover);
+}
+.formula-note {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+  margin-top: 5px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.45;
+}
+.formula-note strong {
+  color: var(--ink);
+  font-size: .8125rem;
+}
+.formula-expr {
+  font-family: var(--mono);
+  color: var(--ink);
+  font-size: .78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
 .price-number {
   font-size: clamp(1.12rem, 1.9vw, 1.44rem);
   font-family: var(--mono);

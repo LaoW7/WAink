@@ -1,8 +1,11 @@
+"use client";
+
 import {
-  CarFront, ClipboardList, Focus, KeyRound, LoaderCircle, MapPin, Package, Radar, Share2, ShieldCheck, X,
+  CarFront, ClipboardList, Focus, Info, KeyRound, LoaderCircle, MapPin, Package, Radar, Share2, ShieldCheck, X,
 } from "lucide-react";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { translations, type Locale } from "@/lib/i18n";
+import { computeGameRegistrationFee } from "@/lib/registration-fee";
 import type { ScanReply, ScanResult } from "@/lib/scan";
 import { formatPrice } from "@/lib/share-card";
 
@@ -63,11 +66,46 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
 
 export const sampleRecord = sampleRecords.en;
 
-function Price({ label, price, currencyLocale }: { label: string; price: ScanResult["valuation"]; currencyLocale: Locale }) {
+function Price({
+  label, price, currencyLocale, info,
+}: {
+  label: string;
+  price: ScanResult["valuation"];
+  currencyLocale: Locale;
+  info?: {
+    open: boolean;
+    ariaLabel: string;
+    title: string;
+    formula: string;
+    note: string;
+    onToggle: () => void;
+  };
+}) {
   return (
     <div className="report-row price-row">
-      <dt>{label}</dt>
+      <dt className="price-label">
+        <span>{label}</span>
+        {info && (
+          <button
+            type="button"
+            className="info-trigger"
+            aria-label={info.ariaLabel}
+            title={info.ariaLabel}
+            aria-expanded={info.open}
+            onClick={info.onToggle}
+          >
+            <Info size={14} aria-hidden />
+          </button>
+        )}
+      </dt>
       <dd className="row-value price-number">{formatPrice(price, currencyLocale)}</dd>
+      {info?.open && (
+        <dd className="formula-note" role="note">
+          <strong>{info.title}</strong>
+          <code className="formula-expr">{info.formula}</code>
+          <span>{info.note}</span>
+        </dd>
+      )}
     </div>
   );
 }
@@ -101,6 +139,7 @@ export function ScanReport({
   onShare?: () => void;
 }) {
   const titleId = useId();
+  const [showFormula, setShowFormula] = useState(false);
   const t = translations[locale].report;
   const shareCopy = translations[locale].share;
   const item = record?.result;
@@ -109,6 +148,11 @@ export function ScanReport({
     ? item.security.access ?? (item.security as { unlock?: Feature }).unlock
     : undefined;
   const currencyLocale = record?.lang ?? locale;
+  const registrationPrice = item ? computeGameRegistrationFee(item, currencyLocale) : null;
+
+  useEffect(() => {
+    setShowFormula(false);
+  }, [record]);
 
   return (
     <section className="panel report" aria-labelledby={titleId} aria-busy={busy}>
@@ -172,7 +216,19 @@ export function ScanReport({
               <dl className="report-table">
                 <Price label={t.valuationLabel} price={item.valuation} currencyLocale={currencyLocale} />
                 {item.category === "vehicle" && (
-                  <Price label={t.registrationLabel} price={item.registrationPrice} currencyLocale={currencyLocale} />
+                  <Price
+                    label={t.registrationLabel}
+                    price={registrationPrice}
+                    currencyLocale={currencyLocale}
+                    info={{
+                      open: showFormula,
+                      ariaLabel: t.registrationFormulaAria,
+                      title: t.registrationFormulaTitle,
+                      formula: t.registrationFormulaExpr,
+                      note: t.registrationFormulaNote,
+                      onToggle: () => setShowFormula((open) => !open),
+                    }}
+                  />
                 )}
               </dl>
             </div>

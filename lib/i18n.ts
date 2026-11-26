@@ -132,6 +132,10 @@ export const translations = {
       objectSpecsTitle: "Target Specs",
       publicSourcesTitle: "Public Sources",
       modelPrefix: "Scan Model · ",
+      registrationFormulaAria: "Show registration fee formula",
+      registrationFormulaTitle: "Formula (For Fun Only)",
+      registrationFormulaExpr: "Registration Fee = Base Fee + Respray & Prep + Market Value × (Base Factor + Access Tier + Security Tier + Tracker Tier)",
+      registrationFormulaNote: "Tiers scale with entry, security, and tracker complexity for GTA-style entertainment.",
     },
     share: {
       button: "Share",
@@ -336,6 +340,10 @@ export const translations = {
       objectSpecsTitle: "识别参数",
       publicSourcesTitle: "公开资料",
       modelPrefix: "识别模型 · ",
+      registrationFormulaAria: "查看登记费计算公式",
+      registrationFormulaTitle: "娱乐计算公式",
+      registrationFormulaExpr: "新登记费 = 现有登记费 + 全车喷漆整备费 + 车辆估值 × (基础洗白系数 + 门锁层级系数 + 防盗等级系数 + 追踪器清理系数)",
+      registrationFormulaNote: "各项系数随门锁、防盗与定位复杂度递增，仅供娱乐参考。",
     },
     share: {
       button: "分享",

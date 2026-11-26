@@ -1,4 +1,5 @@
 import { translations, type Locale } from "./i18n";
+import { computeGameRegistrationFee } from "./registration-fee";
 import type { ScanReply, ScanResult } from "./scan";
 
 export type ShareCardRecord = ScanReply & { model?: string; lang?: Locale };
@@ -181,7 +182,8 @@ export async function renderShareCard({
     rows.push({ label: t.share.cardValuation, value: formatPrice(item.valuation, currencyLocale) });
   }
   if (item.category === "vehicle") {
-    rows.push({ label: t.share.cardRegistration, value: formatPrice(item.registrationPrice, currencyLocale) });
+    const registrationPrice = computeGameRegistrationFee(item, currencyLocale);
+    rows.push({ label: t.share.cardRegistration, value: formatPrice(registrationPrice, currencyLocale) });
   }
 
   const width = 1080;
