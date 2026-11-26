@@ -15,6 +15,7 @@
   --security-surface: #fff5f5;
   --security-border: #eccfd1;
   --security-ink: #a51f30;
+  --money-ink: #267a34;
   --backdrop: #15151566;
   --shadow: 0 16px 56px #0003;
   --font-hud: "Barlow Condensed", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
@@ -40,6 +41,7 @@
   --security-surface: #251b1d;
   --security-border: #563035;
   --security-ink: #ff8a91;
+  --money-ink: #62c46c;
   --backdrop: #050505b3;
   --shadow: 0 16px 56px #0008;
 }
@@ -507,6 +509,7 @@ svg { flex-shrink: 0; }
   overflow-wrap: anywhere;
 }
 .price-number {
+  color: var(--money-ink);
   font-size: clamp(1.38rem, 2.25vw, 1.75rem);
   font-family: var(--font-hud);
   font-weight: 800;

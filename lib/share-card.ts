@@ -34,7 +34,7 @@ export function formatPrice(price: ScanResult["valuation"], currencyLocale: Loca
 }
 
 type CardBadgeIcon = "access" | "security" | "tracker";
-type CardRow = { label: string; value: string; icon?: CardBadgeIcon };
+type CardRow = { label: string; value: string; icon?: CardBadgeIcon; money?: boolean };
 
 const FONT_STACK = '"Barlow Condensed", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif';
 
@@ -200,11 +200,11 @@ export async function renderShareCard({
     rows.push({ label: t.share.cardTracker, value: item.security.tracker.value, icon: "tracker" });
   }
   if (item.category === "vehicle" || item.category === "object") {
-    rows.push({ label: t.share.cardValuation, value: formatPrice(item.valuation, currencyLocale) });
+    rows.push({ label: t.share.cardValuation, value: formatPrice(item.valuation, currencyLocale), money: true });
   }
   if (item.category === "vehicle") {
     const registrationPrice = computeGameRegistrationFee(item, currencyLocale);
-    rows.push({ label: t.share.cardRegistration, value: formatPrice(registrationPrice, currencyLocale) });
+    rows.push({ label: t.share.cardRegistration, value: formatPrice(registrationPrice, currencyLocale), money: true });
   }
 
   const width = 1080;
@@ -364,7 +364,7 @@ export async function renderShareCard({
     const displayValue = locale === "en" ? row.value.toUpperCase() : row.value;
     const fittedVal = fitText(ctx, displayValue, availableValueW, 38, 24, "700");
 
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = row.money ? "#62c46c" : "#ffffff";
     ctx.font = `700 ${fittedVal.size}px ${FONT_STACK}`;
     ctx.textAlign = "right";
     ctx.fillText(fittedVal.text, rightEdge, centerY);
