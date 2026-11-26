@@ -19,7 +19,7 @@ import { DEFAULT_LOCALE, htmlLang, readStoredLocale, translations, writeStoredLo
 import { resolveProvider, type Credentials } from "@/lib/model-providers";
 import { callVision, completionEndpoint, makeScanReplySchema, scanInputSchema, type ScanMode } from "@/lib/scan";
 import { inactiveTrial, requestTrial } from "@/lib/trial-client";
-import { HOLD_MS, type TargetBox } from "@/lib/vehicle-lock";
+import { type TargetBox } from "@/lib/vehicle-lock";
 
 type Frame = { kind: "sample" } | { kind: "live" } | { kind: "photo" | "capture"; data: string };
 type ScanJob = { id: string; controller: AbortController; saved: Promise<boolean> };
@@ -46,7 +46,6 @@ export default function ScannerPage() {
   const [readingFile, setReadingFile] = useState(false);
   const [systemCamera, setSystemCamera] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [demo, setDemo] = useState(false);
   const [error, setError] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
   const scannerHeading = useRef<HTMLHeadingElement>(null);
@@ -57,7 +56,6 @@ export default function ScannerPage() {
   const request = useRef<ScanJob | null>(null);
   const cacheLookupPending = useRef(false);
   const generation = useRef(0);
-  const demoTimer = useRef(0);
   const t = translations[locale];
   const videoActive = frame.kind === "live";
   const captured = frame.kind === "capture";
@@ -68,8 +66,8 @@ export default function ScannerPage() {
     ? t.providers[resolveProvider(personalConfig.provider, personalConfig.model) ?? personalConfig.provider]
     : t.trialAccountLabel;
   const displayRecord = frame.kind === "sample" && record ? sampleRecords[locale] : record;
-  const shareImage = filePreview ? frame.data : "/coast-gt.webp";
-  const canShare = Boolean(displayRecord && !busy && !demo);
+  const shareImage = filePreview ? frame.data : "/sample-tesla.jpg";
+  const canShare = Boolean(displayRecord && !busy);
 
   useEffect(() => {
     document.documentElement.lang = htmlLang(locale);
@@ -180,8 +178,6 @@ export default function ScannerPage() {
       finishScan(job, { status: "cancelled", message: t.scanCancelled }, locale);
       job.controller.abort();
     }
-    window.clearTimeout(demoTimer.current);
-    setDemo(false);
     dismissResultSheet();
   }, [finishScan, dismissResultSheet, locale, t.scanCancelled]);
 
@@ -205,7 +201,6 @@ export default function ScannerPage() {
       const job = request.current;
       request.current = null;
       job?.controller.abort();
-      window.clearTimeout(demoTimer.current);
     };
   }, [stopStream, stopScan, locale]);
 
@@ -238,6 +233,10 @@ export default function ScannerPage() {
 
   async function openCamera() {
     if (!settingsReady || openingCamera || readingFile || request.current) return;
+    if (!activeModel) {
+      setSettingsOpen(true);
+      return;
+    }
     setError("");
     setSystemCamera(false);
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -439,16 +438,6 @@ export default function ScannerPage() {
     }
   }
 
-  function runDemo() {
-    setError("");
-    setDemo(true);
-    setRecord(null);
-    demoTimer.current = window.setTimeout(() => {
-      setDemo(false);
-      presentResult(sampleRecords[locale]);
-    }, HOLD_MS);
-  }
-
   let targetStatus: string = t.aimWaiting;
   if (videoActive) {
     if (!activeModel) targetStatus = preferTrial ? t.aimNeedsTrial : t.aimNeedsModel;
@@ -505,13 +494,13 @@ export default function ScannerPage() {
                 <video ref={webcam} autoPlay muted playsInline aria-label={t.liveCameraAria}
                   onPlaying={() => setCameraReady(true)} />
               ) : (
-                <img src={filePreview ? frame.data : "/coast-gt.webp"}
+                <img src={filePreview ? frame.data : "/sample-tesla.jpg"}
                   alt={captured ? t.altCaptured : filePreview ? t.altPhoto : t.altSample} />
               )}
               <div className="finder-overlay" aria-hidden>
-                {(!filePreview || (captured && busy)) && (
+                {(videoActive || (captured && busy)) && (
                   <div className="aim">
-                    <span className={"reticle " + (demo ? "demo" : videoActive && aim.phase === "locking" ? "locking" : "")}
+                    <span className={"reticle " + (videoActive && aim.phase === "locking" ? "locking" : "")}
                       style={{ "--ring-angle": (busy && captured ? 360 : videoActive ? aim.progress * 360 : 0) + "deg" } as CSSProperties}>
                       <span className="reticle-progress" />
                       {busy ? <LoaderCircle className="spin" size={26} /> :
@@ -525,7 +514,6 @@ export default function ScannerPage() {
               <div className="viewfinder-caption">
                 {videoActive ? (cameraReady ? t.captionRearPreferred : t.captionStarting)
                   : captured ? t.captionLocked : filePreview ? t.captionPreview : t.captionSample}
-                {demo && <span>{t.captionDemo}</span>}
               </div>
             </div>
             {videoActive && <span className="sr-only" role="status">{targetStatus}</span>}
@@ -554,7 +542,7 @@ export default function ScannerPage() {
                   )}
                 </>
               ) : (
-                <button className="button primary" disabled={!settingsReady || openingCamera || readingFile || busy || demo}
+                <button className="button primary" disabled={!settingsReady || openingCamera || readingFile || busy}
                   onClick={() => void openCamera()}>
                   {openingCamera || busy
                     ? <LoaderCircle className="spin" size={19} aria-hidden />
@@ -562,14 +550,11 @@ export default function ScannerPage() {
                   {busy ? t.scanning : openingCamera ? t.openingCamera : t.startScan}
                 </button>
               )}
-              <button className="button secondary" disabled={!settingsReady || readingFile || busy || demo}
+              <button className="button secondary" disabled={!settingsReady || readingFile || busy}
                 onClick={() => fileInput.current?.click()}>
                 {readingFile ? <LoaderCircle className="spin" size={19} aria-hidden /> : <ImagePlus size={19} aria-hidden />}
                 {readingFile ? t.readingPhoto : t.uploadPhoto}
               </button>
-              {frame.kind === "sample" && !systemCamera &&
-                <button className="button text-button" disabled={!settingsReady || openingCamera || demo || readingFile}
-                  onClick={runDemo}><ScanLine size={18} aria-hidden />{t.demoScan}</button>}
               {systemCamera && !videoActive && <button className="button text-button" disabled={readingFile || busy}
                 onClick={() => cameraInput.current?.click()}>{t.systemCamera}</button>}
               {frame.kind === "photo" && !busy && <button className="button text-button"
@@ -602,7 +587,7 @@ export default function ScannerPage() {
           <ScanReport
             locale={locale}
             record={displayRecord}
-            busy={busy || demo}
+            busy={busy}
             awaiting={videoActive ? t.awaitingLive : captured ? t.awaitingCaptured : t.awaitingDefault}
             onShare={canShare ? () => setShareOpen(true) : undefined}
           />

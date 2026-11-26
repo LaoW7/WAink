@@ -25,19 +25,23 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
     lang: "en",
     result: {
       category: "vehicle",
-      name: "Coast GT",
-      subtitle: "Classic Coupe · 80s Retro",
-      summary: "Coral red widebody against a palm-tree sunset—parked like a neon 'come take me' sign. No factory locator on this relic, though those full-width taillights practically earn two stars before the respray shop.",
+      name: "Tesla Model 3 (Highland)",
+      subtitle: "2024 All-Electric Midsize Sedan",
+      summary: "Pearl white paint on dark Photon wheels—this refreshed Model 3 glides through mountain switchbacks quiet as a ghost, saving you a trip to the respray shop.",
       details: [
-        { label: "Exterior Color", value: "Coral Red" },
-        { label: "Body Style", value: "2-Door Coupe" },
+        { label: "Powertrain", value: "Rear-wheel single-motor electric drive" },
+        { label: "Exterior", value: "Refreshed sharp LED headlights & fog-light-free bumper" },
+        { label: "Wheels", value: "18-inch dark Photon aero wheels" },
+        { label: "Doors", value: "Flush black door handles & frameless windows" },
+        { label: "Roof", value: "Full-length panoramic glass roof" },
+        { label: "Range", value: "606 km CLTC (RWD)" },
       ],
-      valuation: { min: 25000, max: 38000 },
-      registrationPrice: { min: 80, max: 220 },
+      valuation: { min: 29000, max: 36000 },
+      registrationPrice: { min: 150, max: 300 },
       security: {
-        alarm: { value: "Factory Alarm", evidence: "Standard factory security package on coupes of this era." },
-        access: { value: "Mechanical Key Lock", evidence: "Physical door locks and mechanical key ignition; cylinder servicing required if jammed." },
-        tracker: { value: "No OEM Tracker", evidence: "Classic 80s chassis shipped without factory telematics." },
+        alarm: { value: "Sentry Mode & Factory Alarm", evidence: "Multi-camera perimeter surveillance with Sentry Mode monitoring and PIN to Drive lock." },
+        access: { value: "NFC Key Card & Phone Digital Key", evidence: "Flush door handles with a B-pillar NFC reader; tap the backup key card on the B-pillar if the phone stops responding." },
+        tracker: { value: "Tesla App Remote Locator", evidence: "Built-in factory cellular telematics supporting real-time GPS tracking and remote controls via the Tesla app." },
       },
     },
   },
@@ -46,19 +50,23 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
     lang: "zh",
     result: {
       category: "vehicle",
-      name: "海岸 GT",
-      subtitle: "经典双门跑车 · 80 年代风格",
-      summary: "珊瑚红宽体配棕榈落日，停海边跟插了面“速来接管”的旗子似的。老家伙没定位倒省心，就是这贯穿尾灯太扎眼，开进喷漆店前怕是得先吃两颗星。",
+      name: "Tesla Model 3 (焕新版)",
+      subtitle: "2024款 纯电动中型轿车",
+      summary: "珍珠白涂装配上熏黑光子轮毂，这台焕新版Model 3在山道上安静得像个幽灵，连进喷漆店改色都省了。",
       details: [
-        { label: "外观颜色", value: "珊瑚红" },
-        { label: "车身形式", value: "双门硬顶" },
+        { label: "动力形式", value: "后置单电机纯电驱动" },
+        { label: "外观特征", value: "焕新版锐利LED大灯与无雾灯前杠" },
+        { label: "轮毂配置", value: "18英寸熏黑光子低风阻轮毂" },
+        { label: "车门设计", value: "隐藏式熏黑门把手与无框车门" },
+        { label: "车顶结构", value: "一体式全景玻璃车顶" },
+        { label: "续航表现", value: "CLTC工况606公里（后轮驱动版）" },
       ],
-      valuation: { min: 180000, max: 260000 },
-      registrationPrice: { min: 120, max: 300 },
+      valuation: { min: 185000, max: 235000 },
+      registrationPrice: { min: 200, max: 300 },
       security: {
-        alarm: { value: "原厂警报", evidence: "80 年代双门跑车常见原厂安保配置。" },
-        access: { value: "传统机械钥匙", evidence: "物理门锁配合机械钥匙点火，门锁卡滞需检修机械锁芯。" },
-        tracker: { value: "无原厂定位", evidence: "80 年代经典车型未配备原厂车联网定位模块。" },
+        alarm: { value: "原厂哨兵模式与防盗警报", evidence: "车身四周搭载多颗高清摄像头，支持哨兵模式监控与PIN码驾驶锁定" },
+        access: { value: "NFC卡片与手机数字钥匙", evidence: "采用隐藏式门把手与B柱NFC感应区；手机失灵时可用NFC卡片刷B柱解锁" },
+        tracker: { value: "Tesla App 远程定位系统", evidence: "原厂标配车载联网模块，支持手机App实时追踪GPS位置与远程控车" },
       },
     },
   },
@@ -77,7 +85,6 @@ function Price({
     ariaLabel: string;
     title: string;
     formula: string;
-    note: string;
     onToggle: () => void;
   };
 }) {
@@ -103,7 +110,6 @@ function Price({
         <dd className="formula-note" role="note">
           <strong>{info.title}</strong>
           <code className="formula-expr">{info.formula}</code>
-          <span>{info.note}</span>
         </dd>
       )}
     </div>
@@ -158,9 +164,9 @@ export function ScanReport({
     <section className="panel report" aria-labelledby={titleId} aria-busy={busy}>
       <div className="panel-heading">
         <h2 id={titleId}><ClipboardList aria-hidden />{t.heading}</h2>
-        {(record?.model || (item && onShare) || onDismiss) && (
+        {(item || onDismiss) && (
           <div className="report-heading-actions">
-            {record?.model && <span className="pill connected">{t.pillAi}</span>}
+            {item && <span className="pill connected">{t.pillAi}</span>}
             {item && onShare && (
               <button
                 type="button"
@@ -225,7 +231,6 @@ export function ScanReport({
                       ariaLabel: t.registrationFormulaAria,
                       title: t.registrationFormulaTitle,
                       formula: t.registrationFormulaExpr,
-                      note: t.registrationFormulaNote,
                       onToggle: () => setShowFormula((open) => !open),
                     }}
                   />
