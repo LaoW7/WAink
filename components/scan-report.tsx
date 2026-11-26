@@ -32,8 +32,8 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
         { label: "Exterior Color", value: "Coral Red" },
         { label: "Body Style", value: "2-Door Coupe" },
       ],
-      valuation: { min: 25000, max: 38000, basis: "Classic 2-door coupe market value" },
-      registrationPrice: { min: 80, max: 220, basis: "Standard title & plate registration fee" },
+      valuation: { min: 25000, max: 38000 },
+      registrationPrice: { min: 80, max: 220 },
       security: {
         alarm: { value: "Factory Alarm", evidence: "Standard factory security package on coupes of this era." },
         access: { value: "Mechanical Key Lock", evidence: "Physical door locks and mechanical key ignition; cylinder servicing required if jammed." },
@@ -53,8 +53,8 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
         { label: "外观颜色", value: "珊瑚红" },
         { label: "车身形式", value: "双门硬顶" },
       ],
-      valuation: { min: 180000, max: 260000, basis: "经典双门跑车二手行情" },
-      registrationPrice: { min: 120, max: 300, basis: "车辆登记工本费" },
+      valuation: { min: 180000, max: 260000 },
+      registrationPrice: { min: 120, max: 300 },
       security: {
         alarm: { value: "原厂警报", evidence: "80 年代双门跑车常见原厂安保配置。" },
         access: { value: "传统机械钥匙", evidence: "物理门锁配合机械钥匙点火，门锁卡滞需检修机械锁芯。" },

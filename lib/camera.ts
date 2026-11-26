@@ -51,7 +51,8 @@ function makeJpeg(source: CanvasImageSource, width: number, height: number, targ
   const bottom = target ? Math.min(1, target.y + target.height * (1 + pad)) : 1;
   const sourceWidth = (right - left) * width;
   const sourceHeight = (bottom - top) * height;
-  const scale = Math.min(1, 1440 / Math.max(sourceWidth, sourceHeight));
+  const maxEdge = target ? 896 : 1024;
+  const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(sourceWidth * scale));
   canvas.height = Math.max(1, Math.round(sourceHeight * scale));
@@ -66,7 +67,7 @@ function makeJpeg(source: CanvasImageSource, width: number, height: number, targ
     source, left * width, top * height, sourceWidth, sourceHeight,
     0, 0, canvas.width, canvas.height,
   );
-  const data = canvas.toDataURL("image/jpeg", 0.86);
+  const data = canvas.toDataURL("image/jpeg", 0.80);
   return data.length <= 2_800_024 ? data : canvas.toDataURL("image/jpeg", 0.64);
 }
 

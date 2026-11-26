@@ -13,7 +13,7 @@ import { sampleRecords, ScanReport, type ScanRecord } from "@/components/scan-re
 import { MOBILE_REPORT_VIEWPORT, ScanResultSheet } from "@/components/scan-result-sheet";
 import { defaultScanPreferences, readBrowserSettings, writeModelSettings, writeScanPreferences, writeTrialPreference, type ScanPreferences } from "@/lib/browser-settings";
 import { cameraError, captureFrame, loadPhoto, useVehicleDetector } from "@/lib/camera";
-import { saveHistoryFrame, saveHistoryOutcome, type ScanOutcome, type ScanSource } from "@/lib/history";
+import { computeScanCacheKey, findCachedScan, saveHistoryFrame, saveHistoryOutcome, type ScanOutcome, type ScanSource } from "@/lib/history";
 import { DEFAULT_LOCALE, htmlLang, readStoredLocale, translations, writeStoredLocale, type Locale } from "@/lib/i18n";
 import { resolveProvider, type Credentials } from "@/lib/model-providers";
 import { callVision, completionEndpoint, makeScanReplySchema, scanInputSchema, type ScanMode } from "@/lib/scan";
@@ -53,6 +53,7 @@ export default function ScannerPage() {
   const cameraInput = useRef<HTMLInputElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const request = useRef<ScanJob | null>(null);
+  const cacheLookupPending = useRef(false);
   const generation = useRef(0);
   const demoTimer = useRef(0);
   const t = translations[locale];
@@ -279,8 +280,8 @@ export default function ScannerPage() {
     setRecord(sampleRecords[locale]);
   }
 
-  async function scanImage(image: string, scanMode: ScanMode, source: ScanSource) {
-    if (!activeModel || request.current) return;
+  async function scanImage(image: string, scanMode: ScanMode, source: ScanSource, bypassCache = false) {
+    if (!activeModel || request.current || cacheLookupPending.current) return;
     const scanLocale = locale;
     const copy = translations[scanLocale];
     const input = scanInputSchema.safeParse({ image, mode: scanMode, note, model: activeModel, lang: scanLocale });
@@ -295,9 +296,27 @@ export default function ScannerPage() {
       setFrame({ kind: "capture", data: image });
     }
 
+    const scanGeneration = generation.current;
+    cacheLookupPending.current = true;
+    let cacheKey: string | undefined;
+    try {
+      cacheKey = await computeScanCacheKey({ image, mode: scanMode, lang: scanLocale, note }).catch(() => undefined);
+      if (!bypassCache && cacheKey) {
+        const cached = await findCachedScan(cacheKey).catch(() => null);
+        if (cached && generation.current === scanGeneration) {
+          setError("");
+          presentResult({ ...cached.reply, model: cached.model, lang: cached.lang ?? scanLocale });
+          return;
+        }
+      }
+      if (generation.current !== scanGeneration || request.current) return;
+    } finally {
+      cacheLookupPending.current = false;
+    }
+
     const id = Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) => value.toString(16).padStart(8, "0")).join("");
     const controller = new AbortController();
-    const saved = saveHistoryFrame({ id, createdAt: Date.now(), source, model: activeModel, lang: scanLocale }, image)
+    const saved = saveHistoryFrame({ id, createdAt: Date.now(), source, model: activeModel, lang: scanLocale, cacheKey }, image)
       .then(() => {
         setHistoryRevision((revision) => revision + 1);
         return true;
@@ -388,7 +407,7 @@ export default function ScannerPage() {
   async function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
-    if (!file || request.current) return;
+    if (!file || request.current || cacheLookupPending.current) return;
     const current = ++generation.current;
     setOpeningCamera(false);
     setReadingFile(true);
@@ -546,7 +565,7 @@ export default function ScannerPage() {
               {systemCamera && !videoActive && <button className="button text-button" disabled={readingFile || busy}
                 onClick={() => cameraInput.current?.click()}>{t.systemCamera}</button>}
               {frame.kind === "photo" && !busy && <button className="button text-button"
-                onClick={() => activeModel ? void scanImage(frame.data, mode, "photo") : setSettingsOpen(true)}>
+                onClick={() => activeModel ? void scanImage(frame.data, mode, "photo", Boolean(record)) : setSettingsOpen(true)}>
                 <ScanLine size={18} aria-hidden />{activeModel ? (record ? t.rescanPhoto : t.scanPhoto) : t.configureAiScan}
               </button>}
               {busy && <button className="button text-button" onClick={() => {

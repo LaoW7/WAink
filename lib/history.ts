@@ -1,5 +1,5 @@
 import type { Locale } from "./i18n";
-import type { ScanReply } from "./scan";
+import type { ScanMode, ScanReply } from "./scan";
 
 export type ScanSource = "camera" | "photo";
 
@@ -13,6 +13,7 @@ export type HistoryEntry = {
   source: ScanSource;
   model: string;
   lang?: Locale;
+  cacheKey?: string;
   frame: Blob;
   outcome?: ScanOutcome;
 };
@@ -52,6 +53,20 @@ async function inHistoryStore<T>(
   }
 }
 
+export async function computeScanCacheKey({
+  image, mode, lang, note,
+}: {
+  image: string;
+  mode: ScanMode;
+  lang: Locale;
+  note: string;
+}): Promise<string | undefined> {
+  if (!globalThis.crypto?.subtle) return undefined;
+  const payload = new TextEncoder().encode([mode, lang, note.trim(), image].join("\0"));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", payload);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function saveHistoryFrame(entry: Omit<HistoryEntry, "frame" | "outcome">, image: string) {
   const encoded = image.slice("data:image/jpeg;base64,".length);
   const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
@@ -78,4 +93,14 @@ export function readScanHistory() {
     const read = store.getAll();
     return () => (read.result as HistoryEntry[]).sort((a, b) => b.createdAt - a.createdAt);
   });
+}
+
+export async function findCachedScan(cacheKey: string) {
+  const entries = await readScanHistory();
+  for (const entry of entries) {
+    if (entry.cacheKey === cacheKey && entry.outcome?.status === "completed") {
+      return { reply: entry.outcome.reply, model: entry.model, lang: entry.lang };
+    }
+  }
+  return null;
 }
