@@ -372,7 +372,6 @@ svg { flex-shrink: 0; }
   gap: 6px;
   font-weight: 700;
 }
-.report-confidence { color: var(--muted); font-size: .8125rem; }
 .report-title-card h3 {
   margin-top: 5px;
   font-size: clamp(1.7rem, 3vw, 2.32rem);
@@ -428,14 +427,6 @@ svg { flex-shrink: 0; }
   gap: 3px 7px;
   color: var(--muted);
   font-size: .8125rem;
-}
-.attribute {
-  background: var(--surface);
-  border: 1px solid var(--security-border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: .75rem;
-  white-space: nowrap;
 }
 .security-evidence { flex: 1 1 135px; }
 

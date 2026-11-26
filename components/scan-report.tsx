@@ -28,17 +28,16 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
       name: "Coast GT",
       subtitle: "Classic Coupe · 80s Retro",
       summary: "Coral red widebody against a palm-tree sunset—parked like a neon 'come take me' sign. No factory locator on this relic, though those full-width taillights practically earn two stars before the respray shop.",
-      confidence: "medium",
       details: [
         { label: "Exterior Color", value: "Coral Red" },
         { label: "Body Style", value: "2-Door Coupe" },
       ],
-      valuation: { min: 25000, max: 38000, basis: "Classic 2-door coupe resale estimate" },
+      valuation: { min: 25000, max: 38000, basis: "Classic 2-door coupe market value" },
       registrationPrice: { min: 80, max: 220, basis: "Standard title & plate registration fee" },
       security: {
-        alarm: { value: "Likely Factory Alarm", source: "inferred", confidence: "medium", evidence: "Inferred from common factory security options on coupes of this era." },
-        access: { value: "Mechanical Key Lock", source: "inferred", confidence: "medium", evidence: "80s coupes use physical door locks and key ignition; sticking locks require cylinder servicing." },
-        tracker: { value: "Likely No OEM Tracker", source: "inferred", confidence: "low", evidence: "Vehicles from this era generally shipped without factory telematics." },
+        alarm: { value: "Factory Alarm", evidence: "Standard factory security package on coupes of this era." },
+        access: { value: "Mechanical Key Lock", evidence: "Physical door locks and mechanical key ignition; cylinder servicing required if jammed." },
+        tracker: { value: "No OEM Tracker", evidence: "Classic 80s chassis shipped without factory telematics." },
       },
     },
   },
@@ -50,17 +49,16 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
       name: "海岸 GT",
       subtitle: "经典双门跑车 · 80 年代风格",
       summary: "珊瑚红宽体配棕榈落日，停海边跟插了面“速来接管”的旗子似的。老家伙没定位倒省心，就是这贯穿尾灯太扎眼，开进喷漆店前怕是得先吃两颗星。",
-      confidence: "medium",
       details: [
         { label: "外观颜色", value: "珊瑚红" },
         { label: "车身形式", value: "双门硬顶" },
       ],
-      valuation: { min: 180000, max: 260000, basis: "经典双门跑车二手估价" },
+      valuation: { min: 180000, max: 260000, basis: "经典双门跑车二手行情" },
       registrationPrice: { min: 120, max: 300, basis: "车辆登记工本费" },
       security: {
-        alarm: { value: "疑似原厂警报", source: "inferred", confidence: "medium", evidence: "按同年代车型的常见选装配置推测。" },
-        access: { value: "传统机械钥匙", source: "inferred", confidence: "medium", evidence: "80 年代双门跑车普遍采用物理门锁与机械钥匙点火，若门锁卡滞通常需检修机械锁芯。" },
-        tracker: { value: "可能无原厂定位", source: "inferred", confidence: "low", evidence: "这一年代的车型通常未提供原厂车联网服务。" },
+        alarm: { value: "原厂警报", evidence: "80 年代双门跑车常见原厂安保配置。" },
+        access: { value: "传统机械钥匙", evidence: "物理门锁配合机械钥匙点火，门锁卡滞需检修机械锁芯。" },
+        tracker: { value: "无原厂定位", evidence: "80 年代经典车型未配备原厂车联网定位模块。" },
       },
     },
   },
@@ -92,22 +90,17 @@ function Price({ label, price, currencyLocale }: { label: string; price: ScanRes
 }
 
 function Security({
-  label, feature, icon: Icon, locale,
+  label, feature, icon: Icon,
 }: {
   label: string;
   feature: Feature;
   icon: typeof Radar;
-  locale: Locale;
 }) {
-  const t = translations[locale].report;
   return (
     <div className="report-row security-row">
       <dt className="feature-label"><Icon size={17} aria-hidden />{label}</dt>
       <dd className="row-value security-value">{feature.value}</dd>
       <dd className="security-context">
-        <span className="attribute">
-          {t.featureSource[feature.source]} · {t.confidencePrefix}{t.confidence[feature.confidence]}
-        </span>
         <span className="security-evidence">{feature.evidence}</span>
       </dd>
     </div>
@@ -160,7 +153,6 @@ export function ScanReport({
           <div className="report-title-card">
             <div className="report-title-meta">
               <span className="kind-label"><KindIcon size={16} aria-hidden />{t.categories[item.category]}</span>
-              <span className="report-confidence">{t.confidencePrefix}{t.confidence[item.confidence]}</span>
             </div>
             <h3>{item.name}</h3>
             {item.subtitle && <p className="subtitle">{item.subtitle}</p>}
@@ -170,9 +162,9 @@ export function ScanReport({
             <div className="report-group">
               <h4>{t.securityTitle}</h4>
               <dl className="report-table security-list">
-                <Security label={t.alarmLabel} feature={item.security.alarm} icon={ShieldCheck} locale={locale} />
-                {access && <Security label={t.accessLabel} feature={access} icon={KeyRound} locale={locale} />}
-                <Security label={t.trackerLabel} feature={item.security.tracker} icon={Radar} locale={locale} />
+                <Security label={t.alarmLabel} feature={item.security.alarm} icon={ShieldCheck} />
+                {access && <Security label={t.accessLabel} feature={access} icon={KeyRound} />}
+                <Security label={t.trackerLabel} feature={item.security.tracker} icon={Radar} />
               </dl>
             </div>
           )}
