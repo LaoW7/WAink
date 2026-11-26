@@ -11,30 +11,34 @@ export const modes = {
 
 export type ScanMode = keyof typeof modes;
 
-const shortText = z.string().trim().min(1).max(100);
-const explanation = z.string().trim().min(1).max(360);
+const shortText = z.string().trim().min(1).max(160);
+const explanation = z.string().trim().min(1).max(600);
 
 const vehicleFeature = z.object({
   value: shortText,
   evidence: explanation,
 });
 
+const finiteAmount = z.union([
+  z.number(),
+  z.string().trim().regex(/^\d+(?:\.\d+)?$/).transform(Number),
+]).pipe(z.number().finite().min(0).max(1_000_000_000));
+
 const price = z.object({
-  min: z.number().finite().min(0).max(1_000_000_000),
-  max: z.number().finite().min(0).max(1_000_000_000),
-  basis: explanation.optional(),
-}).refine(({ min, max }) => min <= max, "Invalid price range");
+  min: finiteAmount,
+  max: finiteAmount,
+}).transform(({ min, max }) => (min <= max ? { min, max } : { min: max, max: min }));
 
 export function makeResultSchema(lang: Locale = "en") {
   return z.object({
     category: z.enum(["vehicle", "landmark", "object", "unknown"]),
     name: shortText,
-    subtitle: z.string().trim().max(100),
+    subtitle: z.string().trim().max(160).nullish().transform((value) => value ?? ""),
     summary: explanation,
-    details: z.array(z.object({ label: shortText, value: shortText })).max(7),
-    valuation: price.nullable(),
-    registrationPrice: price.nullable(),
-    security: z.object({ alarm: vehicleFeature, access: vehicleFeature, tracker: vehicleFeature }).nullable(),
+    details: z.array(z.object({ label: shortText, value: shortText })).transform((items) => items.slice(0, 7)),
+    valuation: price.nullish().transform((value) => value ?? null),
+    registrationPrice: price.nullish().transform((value) => value ?? null),
+    security: z.object({ alarm: vehicleFeature, access: vehicleFeature, tracker: vehicleFeature }).nullish().transform((value) => value ?? null),
   }).superRefine((result, context) => {
     if (result.category === "vehicle" && !result.security) {
       context.addIssue({
@@ -107,7 +111,7 @@ Output ONLY a single JSON object parseable by JSON.parse—no Markdown code fenc
 Rules:
 - For vehicles, identify the make, model, model year, and generation, then state the typical body style, powertrain, and factory equipment directly. For landmarks, highlight location traits; for objects, cover brand, category, and visible materials. Include at most 7 items in details. Use category="unknown" when completely unrecognizable.
 - When web lookup is available and a vehicle line is identified, check manufacturer manuals, trim specification sheets, and public service literature first—focusing on factory alarm systems, engine immobilizers, door-entry and ignition architecture (mechanical key, remote fob, passive keyless entry with push-button start, NFC key card, or smartphone digital key, along with standard road-trip fault troubleshooting and authorized service steps if a door latch or key stops responding), and OEM telematics / remote vehicle locator services. Use public sources for local valuation and registration fees when regional clues exist. If lookup is unavailable or finds no match, ground every field in known model-year, sibling-trim, and segment specs without claiming a search occurred or fabricating citations.
-- For every vehicle, output direct model-level facts for alarm (OEM alarm/security), access (door-entry & ignition tier plus owner fault-troubleshooting context), and tracker (OEM telematics/remote locator). Frame "access" from a driver's road-trip maintenance & troubleshooting perspective (e.g., "Mechanical Key & Cylinder | Check latch cylinder or call a certified locksmith if jammed", "Keyless Entry & Push-Start | Use emergency fob blade or backup sensor pad if battery dies", "NFC Card & Digital Key | Use B-pillar backup reader or dealer diagnostics on error"). Ground "evidence" in visible features (exposed door keyhole, flush pop-out handles, touch-sensor handle recess, B-pillar NFC reader) or generation specs—never write excuses like "cannot tell from exterior". Model-level references do not verify hidden aftermarket gear on a specific car—never provide unauthorized entry techniques or destructive instructions.
+- For every vehicle, output direct model-level facts for alarm (OEM alarm/security), access (door-entry & ignition tier plus owner fault-troubleshooting context), and tracker (OEM telematics/remote locator). Keep each "value" concise (e.g., "Mechanical Key Lock", "Keyless Entry & Push-Start", "NFC Card & Digital Key") and put the driver's road-trip maintenance & troubleshooting note into "evidence" (e.g., "Check latch cylinder or call a certified locksmith if jammed", "Use emergency fob blade or backup sensor pad if battery dies", "Use B-pillar backup reader or dealer diagnostics on error"). Ground "evidence" in visible features (exposed door keyhole, flush pop-out handles, touch-sensor handle recess, B-pillar NFC reader) or generation specs—never write excuses like "cannot tell from exterior". Model-level references do not verify hidden aftermarket gear on a specific car—never provide unauthorized entry techniques or destructive instructions.
 - Direct Dossier Tone: State every entry decisively and concisely as direct dossier facts. Strictly forbid hedging, speculation, confidence scores, or meta-AI wording in all JSON string values—never output words or phrases such as "AI", "AI判断", "AI推测", "AI估价", "置信度", "推测", "推断", "疑似", "可能", "有可能", "大概", "或许", "预估", "估算", "不确定" in Chinese, or "AI", "AI inferred", "confidence", "likely", "possibly", "probably", "maybe", "might", "suspected", "inferred", "estimated", "uncertain" in English.
 - valuation is the used-market price range; registrationPrice is the title/plate registration fee range (excluding purchase tax, insurance, and dealer fees). Use numeric amounts matching the requested \`currency\` unless user notes specify another city/region. Never copy placeholder zeros. Return null when inapplicable. Non-vehicles must set registrationPrice and security to null; landmarks and unknown targets must also set valuation to null.
 - When an image is clearly labeled as video game content (such as an open-world city or racing game), state the in-game security, entry-tier, and locator status shown on screen and note that it comes from game footage. Return null for prices when no real-world currency equivalent applies.
@@ -155,7 +159,7 @@ export function buildVisionRequest(input: ScanInput, { lookup, reasoningEffort, 
     reasoning: { effort: "low" },
     tools: [{ type: "web_search", search_context_size: "low" }],
     max_tool_calls: 2,
-    max_output_tokens: 1200,
+    max_output_tokens: 3200,
     input: [{
       role: "user",
       content: [
@@ -167,7 +171,6 @@ export function buildVisionRequest(input: ScanInput, { lookup, reasoningEffort, 
 
   return {
     model: input.model,
-    max_tokens: 1000,
     ...(lookup === "qwen" ? { enable_search: true, enable_thinking: false } : {}),
     ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
     ...(disableThinking ? { thinking: { type: "disabled" } } : {}),
@@ -258,7 +261,7 @@ export async function readScanRequest(request: Request, fallbackLang: Locale = "
 }
 
 export function parseScanResult(content: string, lang: Locale = "en"): ScanResult {
-  const clean = content.trim().replace(/^<think>[\s\S]*?<\/think>\s*/i, "");
+  const clean = content.trim().replace(/^(?:<(?:think|thought)>[\s\S]*?<\/(?:think|thought)>\s*)+/i, "");
   const start = clean.indexOf("{");
   const end = clean.lastIndexOf("}");
   if (start !== -1 && end > start) {
