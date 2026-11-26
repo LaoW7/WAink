@@ -15,7 +15,7 @@ import { ShareCardDialog } from "@/components/share-card-dialog";
 import { defaultScanPreferences, readBrowserSettings, writeModelSettings, writeScanPreferences, writeTrialPreference, type ScanPreferences } from "@/lib/browser-settings";
 import { cameraError, captureFrame, loadPhoto, useVehicleDetector } from "@/lib/camera";
 import { computeScanCacheKey, findCachedScan, saveHistoryFrame, saveHistoryOutcome, type ScanOutcome, type ScanSource } from "@/lib/history";
-import { DEFAULT_LOCALE, htmlLang, readStoredLocale, translations, writeStoredLocale, type Locale } from "@/lib/i18n";
+import { DEFAULT_LOCALE, htmlLang, resolveInitialLocale, translations, writeStoredLocale, type Locale } from "@/lib/i18n";
 import { resolveProvider, type Credentials } from "@/lib/model-providers";
 import { callVision, completionEndpoint, makeScanReplySchema, scanInputSchema, type ScanMode } from "@/lib/scan";
 import { inactiveTrial, requestTrial } from "@/lib/trial-client";
@@ -77,8 +77,8 @@ export default function ScannerPage() {
   useEffect(() => {
     const controller = new AbortController();
     let mounted = true;
-    const storedLocale = readStoredLocale();
-    setLocale(storedLocale);
+    const initialLocale = resolveInitialLocale();
+    setLocale(initialLocale);
     try {
       const saved = readBrowserSettings();
       setConfig(saved.config);
@@ -86,10 +86,10 @@ export default function ScannerPage() {
       setPreferences(saved.preferences);
       setPreferTrial(saved.preferTrial);
     } catch {
-      setStorageWarning(translations[storedLocale].warnReadSettings);
+      setStorageWarning(translations[initialLocale].warnReadSettings);
     }
     const timeout = window.setTimeout(() => controller.abort(), 4000);
-    void requestTrial({ signal: controller.signal }, storedLocale)
+    void requestTrial({ signal: controller.signal }, initialLocale)
       .then((status) => {
         if (!mounted) return;
         setTrial(status);

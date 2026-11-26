@@ -3,14 +3,38 @@ export type Locale = "en" | "zh";
 export const DEFAULT_LOCALE: Locale = "en";
 export const LOCALE_STORAGE_KEY = "ai-shuang-kui:lang";
 
-export function readStoredLocale(): Locale {
+export function detectBrowserLocale(languages?: readonly string[]): Locale {
+  const candidates =
+    languages ??
+    (typeof navigator !== "undefined"
+      ? navigator.languages && navigator.languages.length > 0
+        ? navigator.languages
+        : navigator.language
+          ? [navigator.language]
+          : []
+      : []);
+
+  for (const raw of candidates) {
+    const tag = raw.trim();
+    if (/^zh(?:[-_]|$)/i.test(tag)) return "zh";
+    if (/^en(?:[-_]|$)/i.test(tag)) return "en";
+  }
+
+  return DEFAULT_LOCALE;
+}
+
+export function readStoredLocale(): Locale | null {
   try {
     const value = localStorage.getItem(LOCALE_STORAGE_KEY);
     if (value === "zh" || value === "en") return value;
   } catch {
     // Ignore storage access errors and keep default locale.
   }
-  return DEFAULT_LOCALE;
+  return null;
+}
+
+export function resolveInitialLocale(): Locale {
+  return readStoredLocale() ?? detectBrowserLocale();
 }
 
 export function writeStoredLocale(locale: Locale) {
