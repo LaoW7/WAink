@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera } from "lucide-react";
+import { Camera, Share2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { translations, type Locale } from "@/lib/i18n";
 import { ScanReport, type ScanRecord } from "./scan-report";
@@ -8,12 +8,13 @@ import { ScanReport, type ScanRecord } from "./scan-report";
 export const MOBILE_REPORT_VIEWPORT = "(max-width: 740px)";
 
 export function ScanResultSheet({
-  locale, record, onDismiss, onStartScan,
+  locale, record, onDismiss, onStartScan, onShare,
 }: {
   locale: Locale;
   record: ScanRecord;
   onDismiss: () => void;
   onStartScan: () => void;
+  onShare?: () => void;
 }) {
   const t = translations[locale];
   const dialog = useRef<HTMLDialogElement>(null);
@@ -45,6 +46,11 @@ export function ScanResultSheet({
         <ScanReport locale={locale} record={record} busy={false} awaiting="" onDismiss={onDismiss} />
       </div>
       <div className="result-sheet-actions">
+        {onShare && (
+          <button type="button" className="button secondary" onClick={onShare}>
+            <Share2 size={18} aria-hidden />{t.share.button}
+          </button>
+        )}
         <button type="button" className="button primary" onClick={() => {
           dialog.current?.close();
           onStartScan();

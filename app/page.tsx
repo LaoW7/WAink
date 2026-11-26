@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ScanHistory } from "@/components/scan-history";
 import { sampleRecords, ScanReport, type ScanRecord } from "@/components/scan-report";
 import { MOBILE_REPORT_VIEWPORT, ScanResultSheet } from "@/components/scan-result-sheet";
+import { ShareCardDialog } from "@/components/share-card-dialog";
 import { defaultScanPreferences, readBrowserSettings, writeModelSettings, writeScanPreferences, writeTrialPreference, type ScanPreferences } from "@/lib/browser-settings";
 import { cameraError, captureFrame, loadPhoto, useVehicleDetector } from "@/lib/camera";
 import { computeScanCacheKey, findCachedScan, saveHistoryFrame, saveHistoryOutcome, type ScanOutcome, type ScanSource } from "@/lib/history";
@@ -38,6 +39,7 @@ export default function ScannerPage() {
   const [frame, setFrame] = useState<Frame>(SAMPLE);
   const [record, setRecord] = useState<ScanRecord | null>(sampleRecords[DEFAULT_LOCALE]);
   const [resultSheetOpen, setResultSheetOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [preferences, setPreferences] = useState(defaultScanPreferences);
   const { mode, note } = preferences;
   const [openingCamera, setOpeningCamera] = useState(false);
@@ -66,6 +68,8 @@ export default function ScannerPage() {
     ? t.providers[resolveProvider(personalConfig.provider, personalConfig.model) ?? personalConfig.provider]
     : t.trialAccountLabel;
   const displayRecord = frame.kind === "sample" && record ? sampleRecords[locale] : record;
+  const shareImage = filePreview ? frame.data : "/coast-gt.webp";
+  const canShare = Boolean(displayRecord && !busy && !demo);
 
   useEffect(() => {
     document.documentElement.lang = htmlLang(locale);
@@ -147,9 +151,13 @@ export default function ScannerPage() {
     media?.getTracks().forEach((track) => track.stop());
   }, []);
 
-  const dismissResultSheet = useCallback(() => setResultSheetOpen(false), []);
+  const dismissResultSheet = useCallback(() => {
+    setResultSheetOpen(false);
+    setShareOpen(false);
+  }, []);
 
   function presentResult(next: ScanRecord) {
+    setShareOpen(false);
     setRecord(next);
     setResultSheetOpen(window.matchMedia(MOBILE_REPORT_VIEWPORT).matches);
   }
@@ -596,6 +604,7 @@ export default function ScannerPage() {
             record={displayRecord}
             busy={busy || demo}
             awaiting={videoActive ? t.awaitingLive : captured ? t.awaitingCaptured : t.awaitingDefault}
+            onShare={canShare ? () => setShareOpen(true) : undefined}
           />
         </div>
 
@@ -617,7 +626,21 @@ export default function ScannerPage() {
       {historyOpen && <ScanHistory locale={locale} revision={historyRevision} activeId={request.current?.id}
         onClose={() => setHistoryOpen(false)} />}
       {resultSheetOpen && displayRecord && !settingsOpen && !historyOpen && (
-        <ScanResultSheet locale={locale} record={displayRecord} onDismiss={dismissResultSheet} onStartScan={startFromResult} />
+        <ScanResultSheet
+          locale={locale}
+          record={displayRecord}
+          onDismiss={dismissResultSheet}
+          onStartScan={startFromResult}
+          onShare={canShare ? () => setShareOpen(true) : undefined}
+        />
+      )}
+      {shareOpen && displayRecord && canShare && (
+        <ShareCardDialog
+          locale={locale}
+          record={displayRecord}
+          image={shareImage}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </>
   );

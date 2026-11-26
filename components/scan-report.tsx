@@ -1,9 +1,10 @@
 import {
-  CarFront, ClipboardList, Focus, KeyRound, LoaderCircle, MapPin, Package, Radar, ShieldCheck, X,
+  CarFront, ClipboardList, Focus, KeyRound, LoaderCircle, MapPin, Package, Radar, Share2, ShieldCheck, X,
 } from "lucide-react";
 import { useId } from "react";
 import { translations, type Locale } from "@/lib/i18n";
 import type { ScanReply, ScanResult } from "@/lib/scan";
+import { formatPrice } from "@/lib/share-card";
 
 export type ScanRecord = ScanReply & { model?: string; lang?: Locale };
 type Feature = NonNullable<ScanResult["security"]>["alarm"];
@@ -14,10 +15,6 @@ const categoryIcons = {
   object: Package,
   unknown: Focus,
 };
-
-const zhAmount = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 });
-const zhTenThousands = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 });
-const enAmount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 export const sampleRecords: Record<Locale, ScanRecord> = {
   en: {
@@ -66,20 +63,6 @@ export const sampleRecords: Record<Locale, ScanRecord> = {
 
 export const sampleRecord = sampleRecords.en;
 
-function formatPrice(price: ScanResult["valuation"], currencyLocale: Locale) {
-  if (!price) return "—";
-  if (currencyLocale === "en") {
-    const low = enAmount.format(price.min);
-    const high = enAmount.format(price.max);
-    return "$" + (low === high ? low : `${low}–$${high}`);
-  }
-  const unit = price.min >= 10_000 ? 10_000 : 1;
-  const formatter = unit === 1 ? zhAmount : zhTenThousands;
-  const low = formatter.format(price.min / unit);
-  const high = formatter.format(price.max / unit);
-  return "¥" + (low === high ? low : low + "–" + high) + (unit === 1 ? "" : " 万");
-}
-
 function Price({ label, price, currencyLocale }: { label: string; price: ScanResult["valuation"]; currencyLocale: Locale }) {
   return (
     <div className="report-row price-row">
@@ -108,16 +91,18 @@ function Security({
 }
 
 export function ScanReport({
-  locale = "en", record, busy, awaiting, onDismiss,
+  locale = "en", record, busy, awaiting, onDismiss, onShare,
 }: {
   locale?: Locale;
   record: ScanRecord | null;
   busy: boolean;
   awaiting: string;
   onDismiss?: () => void;
+  onShare?: () => void;
 }) {
   const titleId = useId();
   const t = translations[locale].report;
+  const shareCopy = translations[locale].share;
   const item = record?.result;
   const KindIcon = item ? categoryIcons[item.category] : Focus;
   const access = item?.security
@@ -129,9 +114,21 @@ export function ScanReport({
     <section className="panel report" aria-labelledby={titleId} aria-busy={busy}>
       <div className="panel-heading">
         <h2 id={titleId}><ClipboardList aria-hidden />{t.heading}</h2>
-        {(record?.model || onDismiss) && (
+        {(record?.model || (item && onShare) || onDismiss) && (
           <div className="report-heading-actions">
             {record?.model && <span className="pill connected">{t.pillAi}</span>}
+            {item && onShare && (
+              <button
+                type="button"
+                className="button settings-button share-trigger"
+                aria-label={shareCopy.buttonAria}
+                title={shareCopy.buttonAria}
+                onClick={onShare}
+              >
+                <Share2 size={16} aria-hidden />
+                <span>{shareCopy.button}</span>
+              </button>
+            )}
             {onDismiss && (
               <button type="button" className="icon-button" aria-label={t.dismissAria} onClick={onDismiss}>
                 <X size={20} aria-hidden />

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { readScanHistory, type HistoryEntry } from "@/lib/history";
 import { translations, type Locale } from "@/lib/i18n";
 import { ScanReport } from "./scan-report";
+import { ShareCardDialog } from "./share-card-dialog";
 
 const PAGE_SIZE = 12;
 
@@ -35,6 +36,7 @@ export function ScanHistory({
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE_SIZE);
 
   const timeFormat = useMemo(() => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
@@ -77,12 +79,17 @@ export function ScanHistory({
   }
 
   function select(id: string | null) {
+    setShareOpen(false);
     setSelectedId(id);
     dialog.current?.scrollTo(0, 0);
   }
 
   const selected = entries?.find(({ id }) => id === selectedId);
   const selectedOutcome = selected?.outcome;
+  const selectedRecord = selected && selectedOutcome?.status === "completed"
+    ? { ...selectedOutcome.reply, model: selected.model, lang: selected.lang ?? "zh" as const }
+    : null;
+
   return (
     <dialog ref={dialog} className="settings-dialog history-dialog" aria-labelledby="history-title"
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
@@ -106,17 +113,20 @@ export function ScanHistory({
             <span className="muted">{sourceLabel(selected)} · {timeFormat.format(selected.createdAt)}</span>
           </div>
           <HistoryFrame blob={selected.frame} alt={t.frameAlt} />
-          {selectedOutcome?.status === "completed" ? (
+          {selectedRecord ? (
             <ScanReport
               locale={locale}
-              record={{ ...selectedOutcome.reply, model: selected.model, lang: selected.lang ?? "zh" }}
+              record={selectedRecord}
               busy={false}
               awaiting=""
+              onShare={() => setShareOpen(true)}
             />
           ) : (
             <div className="history-outcome" role="status">
               <strong>{historyStatus(selected)}</strong>
-              <p className="muted">{selectedOutcome?.message ?? t.fallbackMessage}</p>
+              <p className="muted">
+                {selectedOutcome && selectedOutcome.status !== "completed" ? selectedOutcome.message : t.fallbackMessage}
+              </p>
             </div>
           )}
         </>
@@ -149,6 +159,15 @@ export function ScanHistory({
         </>
       ) : !error && (
         <p className="history-empty" role="status">{entries ? t.empty : t.loading}</p>
+      )}
+
+      {shareOpen && selected && selectedRecord && (
+        <ShareCardDialog
+          locale={locale}
+          record={selectedRecord}
+          image={selected.frame}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </dialog>
   );
