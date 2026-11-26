@@ -36,7 +36,17 @@ export function formatPrice(price: ScanResult["valuation"], currencyLocale: Loca
 type CardBadgeIcon = "access" | "security" | "tracker";
 type CardRow = { label: string; value: string; icon?: CardBadgeIcon };
 
-const FONT_STACK = '"Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif';
+const FONT_STACK = '"Barlow Condensed", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif';
+
+async function ensureCardFonts() {
+  if (typeof document === "undefined" || !("fonts" in document)) return;
+  await Promise.allSettled([
+    document.fonts.load('600 32px "Barlow Condensed"'),
+    document.fonts.load('700 38px "Barlow Condensed"'),
+    document.fonts.load('800 54px "Barlow Condensed"'),
+  ]);
+  await document.fonts.ready;
+}
 
 async function loadImageSource(source: string | Blob): Promise<HTMLImageElement> {
   const isBlob = source instanceof Blob;
@@ -214,7 +224,7 @@ export async function renderShareCard({
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error(t.share.renderError);
 
-  const img = await loadImageSource(image);
+  const [img] = await Promise.all([loadImageSource(image), ensureCardFonts()]);
 
   // Dark ambient backdrop across the full card
   ctx.fillStyle = "#0b0d14";
@@ -262,7 +272,7 @@ export async function renderShareCard({
 
   // Top-left frosted brand badge
   ctx.save();
-  ctx.font = `700 22px ${FONT_STACK}`;
+  ctx.font = `700 26px ${FONT_STACK}`;
   const badgeText = t.share.cardBrandBadge;
   const badgeW = Math.ceil(ctx.measureText(badgeText).width) + 38;
   roundRectPath(ctx, 56, 48, badgeW, 46, 10);
@@ -314,16 +324,16 @@ export async function renderShareCard({
   const topLine = (item.subtitle || t.report.categories[item.category]).toUpperCase();
   const nameLine = locale === "en" ? item.name.toUpperCase() : item.name;
   const headerMaxTextW = panelW - 180;
-  const fittedTop = fitText(ctx, topLine, headerMaxTextW, 28, 20, "650");
+  const fittedTop = fitText(ctx, topLine, headerMaxTextW, 32, 22, "600");
   ctx.fillStyle = "#b4b8c8";
   ctx.textBaseline = "top";
-  ctx.font = `650 ${fittedTop.size}px ${FONT_STACK}`;
-  ctx.fillText(fittedTop.text, panelX + 34, panelY + 28);
+  ctx.font = `600 ${fittedTop.size}px ${FONT_STACK}`;
+  ctx.fillText(fittedTop.text, panelX + 34, panelY + 26);
 
-  const fittedName = fitText(ctx, nameLine, headerMaxTextW, 46, 28, "800");
+  const fittedName = fitText(ctx, nameLine, headerMaxTextW, 54, 32, "800");
   ctx.fillStyle = "#ffffff";
   ctx.font = `800 ${fittedName.size}px ${FONT_STACK}`;
-  ctx.fillText(fittedName.text, panelX + 34, panelY + 66);
+  ctx.fillText(fittedName.text, panelX + 34, panelY + 62);
 
   // Rows
   const bodyTop = panelY + headerH + 6;
@@ -343,7 +353,7 @@ export async function renderShareCard({
 
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#f2f3f7";
-    ctx.font = `750 31px ${FONT_STACK}`;
+    ctx.font = `700 36px ${FONT_STACK}`;
     const labelText = row.label;
     const labelW = ctx.measureText(labelText).width;
     ctx.fillText(labelText, panelX + insetX, centerY);
@@ -352,10 +362,10 @@ export async function renderShareCard({
     const rightEdge = panelX + panelW - insetX - badgeReserved;
     const availableValueW = Math.max(180, rightEdge - (panelX + insetX + labelW + 26));
     const displayValue = locale === "en" ? row.value.toUpperCase() : row.value;
-    const fittedVal = fitText(ctx, displayValue, availableValueW, 33, 21, "750");
+    const fittedVal = fitText(ctx, displayValue, availableValueW, 38, 24, "700");
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = `750 ${fittedVal.size}px ${FONT_STACK}`;
+    ctx.font = `700 ${fittedVal.size}px ${FONT_STACK}`;
     ctx.textAlign = "right";
     ctx.fillText(fittedVal.text, rightEdge, centerY);
     ctx.textAlign = "left";

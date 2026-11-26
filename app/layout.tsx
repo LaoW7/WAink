@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { themeBootstrap } from "@/lib/appearance";
+import "@fontsource/barlow-condensed/500.css";
+import "@fontsource/barlow-condensed/600.css";
+import "@fontsource/barlow-condensed/700.css";
+import "@fontsource/barlow-condensed/800.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
