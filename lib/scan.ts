@@ -144,13 +144,19 @@ function targetContext(input: ScanInput) {
   });
 }
 
+export type ServiceTier = "standard" | "flex" | "priority";
+
 type VisionOptions = {
   lookup?: Lookup;
   reasoningEffort?: "low";
   disableThinking?: boolean;
+  serviceTier?: ServiceTier;
 };
 
-export function buildVisionRequest(input: ScanInput, { lookup, reasoningEffort, disableThinking }: VisionOptions = {}) {
+export function buildVisionRequest(
+  input: ScanInput,
+  { lookup, reasoningEffort, disableThinking, serviceTier }: VisionOptions = {},
+) {
   if (lookup === "openai") return {
     model: input.model,
     store: false,
@@ -174,6 +180,7 @@ export function buildVisionRequest(input: ScanInput, { lookup, reasoningEffort, 
     ...(lookup === "qwen" ? { enable_search: true, enable_thinking: false } : {}),
     ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
     ...(disableThinking ? { thinking: { type: "disabled" } } : {}),
+    ...(serviceTier ? { service_tier: serviceTier } : {}),
     messages: [
       { role: "system", content: SCAN_PROMPT },
       {
@@ -322,7 +329,7 @@ function unpackModelReply(data: unknown, lang: Locale, lookup?: Lookup): ScanRep
 }
 
 export async function callVision({
-  endpoint, apiKey, input, signal, lookup, reasoningEffort, disableThinking, send = fetch,
+  endpoint, apiKey, input, signal, lookup, reasoningEffort, disableThinking, serviceTier, send = fetch,
 }: VisionOptions & {
   endpoint: string;
   apiKey: string;
@@ -340,7 +347,7 @@ export async function callVision({
       redirect: "manual",
       cache: "no-store",
       headers: { "content-type": "application/json", authorization: "Bearer " + apiKey },
-      body: JSON.stringify(buildVisionRequest(input, { lookup, reasoningEffort, disableThinking })),
+      body: JSON.stringify(buildVisionRequest(input, { lookup, reasoningEffort, disableThinking, serviceTier })),
       signal,
     });
   } catch {
@@ -365,8 +372,8 @@ export async function callVision({
       if (/\b(?:api_key_invalid|invalid api key|api key not valid|pass a valid api key)\b/i.test(errorBody)) {
         throw new ScanError(invalidKey, 401);
       }
-      // Some compatible gateways reject unsupported reasoning controls.
-      if ((reasoningEffort || disableThinking) && /reasoning[ _-]?effort|thinking/i.test(errorBody)) {
+      // Some compatible gateways reject unsupported reasoning or service_tier controls.
+      if ((reasoningEffort || disableThinking || serviceTier) && /reasoning[ _-]?effort|thinking|service[ _-]?tier/i.test(errorBody)) {
         return callVision({ endpoint, apiKey, input, signal, send });
       }
     } else if (response.body) {
@@ -375,7 +382,7 @@ export async function callVision({
     if (status === 401 || status === 403) throw new ScanError(invalidKey, 401);
     if (status === 429) throw new ScanError(localized(lang, "Model rate limit or quota exceeded. Please check your account.", "模型服务限流或额度不足，请检查账户后重试。"), 429);
     if (status === 400 || status === 404 || status === 422) {
-      if (lookup) return callVision({ endpoint, apiKey, input, signal, reasoningEffort, disableThinking, send });
+      if (lookup) return callVision({ endpoint, apiKey, input, signal, reasoningEffort, disableThinking, serviceTier, send });
       throw new ScanError(localized(
         lang,
         "Model request was rejected. Verify the model ID, vision support, and API region.",

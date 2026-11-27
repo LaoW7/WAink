@@ -55,6 +55,7 @@ export async function POST(request: Request) {
           input: { ...input, model: trial.model },
           signal: AbortSignal.any([request.signal, AbortSignal.timeout(55_000)]),
           reasoningEffort: "low",
+          serviceTier: trial.serviceTier,
         }));
       } catch (error) {
         if (error instanceof ScanError && error.status === 401) {

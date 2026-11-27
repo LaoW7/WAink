@@ -70,6 +70,7 @@ npm run deploy
 | `TRIAL_SESSION_SECRET` | Secret | 独立的随机签名密钥，至少 32 字符 |
 | `TRIAL_BASE_URL` | Text | HTTPS 的 OpenAI 兼容接口地址，可填写基础地址或完整的 `/chat/completions` 地址 |
 | `TRIAL_MODEL` | Text | 服务端使用的视觉模型 ID |
+| `TRIAL_SERVICE_TIER` | Text | 可选，服务端请求档位（如 Gemini Paid Tier 可填 `flex`、`standard` 或 `priority`） |
 | `TRIAL_SCANS_PER_IP_PER_HOUR` | Text | 同一 IP 滚动一小时内允许的扫描次数，默认 `20`，可填正整数 |
 | `TRIAL_SCANS_GLOBAL_PER_HOUR` | Text | 可选，全站每滚动一小时的体验扫描总上限，默认 `200`，可填正整数 |
 

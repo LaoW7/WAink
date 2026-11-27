@@ -70,6 +70,7 @@ After deploying the Worker, configure runtime variables under **Settings → Var
 | `TRIAL_SESSION_SECRET` | Secret | Independent random signing secret, at least 32 characters |
 | `TRIAL_BASE_URL` | Text | HTTPS OpenAI-compatible base URL or full `/chat/completions` URL |
 | `TRIAL_MODEL` | Text | Vision model ID used on the server |
+| `TRIAL_SERVICE_TIER` | Text | Optional service tier passed to the model endpoint (e.g. `flex`, `standard`, or `priority` for Gemini Paid Tier) |
 | `TRIAL_SCANS_PER_IP_PER_HOUR` | Text | Allowed scans per IP in a rolling 1-hour window (default `20`, positive integer) |
 | `TRIAL_SCANS_GLOBAL_PER_HOUR` | Text | Optional site-wide trial scan cap per rolling 1-hour window (default `200`, positive integer) |
 

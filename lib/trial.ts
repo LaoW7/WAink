@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { completionEndpoint, scanInputSchema } from "./scan";
+import { completionEndpoint, scanInputSchema, type ServiceTier } from "./scan";
 import type { TrialQuota } from "../worker/trial-quota";
 
 type TrialBindings = {
@@ -8,6 +8,7 @@ type TrialBindings = {
   TRIAL_API_KEY?: string;
   TRIAL_BASE_URL?: string;
   TRIAL_MODEL?: string;
+  TRIAL_SERVICE_TIER?: string;
   TRIAL_SCANS_PER_IP_PER_HOUR?: string;
   TRIAL_SCANS_GLOBAL_PER_HOUR?: string;
   TRIAL_LOGIN_LIMIT?: RateLimit;
@@ -24,12 +25,16 @@ export function readTrialConfig() {
   const apiKey = bindings.TRIAL_API_KEY?.trim();
   const baseUrl = bindings.TRIAL_BASE_URL?.trim();
   const model = scanInputSchema.shape.model.safeParse(bindings.TRIAL_MODEL);
+  const rawTier = bindings.TRIAL_SERVICE_TIER?.trim().toLowerCase();
+  const serviceTier: ServiceTier | undefined =
+    rawTier === "standard" || rawTier === "flex" || rawTier === "priority" ? rawTier : undefined;
   const hourlyLimit = Number(bindings.TRIAL_SCANS_PER_IP_PER_HOUR ?? "20");
   const globalHourlyLimit = Number(bindings.TRIAL_SCANS_GLOBAL_PER_HOUR ?? "200");
   const loginLimit = bindings.TRIAL_LOGIN_LIMIT;
   const scanQuota = bindings.TRIAL_SCAN_QUOTA;
   if (!password?.trim() || password.length > 256 || !secret || secret.length < 32 ||
-      !apiKey || !/^[\x21-\x7E]{1,2048}$/.test(apiKey) || !baseUrl || !model.success || !loginLimit || !scanQuota ||
+      !apiKey || !/^[\x21-\x7E]{1,2048}$/.test(apiKey) || !baseUrl || !model.success ||
+      (rawTier && !serviceTier) || !loginLimit || !scanQuota ||
       !Number.isSafeInteger(hourlyLimit) || hourlyLimit < 1 ||
       !Number.isSafeInteger(globalHourlyLimit) || globalHourlyLimit < 1) {
     return null;
@@ -41,6 +46,7 @@ export function readTrialConfig() {
       apiKey,
       endpoint: completionEndpoint(baseUrl),
       model: model.data,
+      serviceTier,
       hourlyLimit,
       globalHourlyLimit,
       loginLimit,
